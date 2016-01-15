@@ -253,7 +253,7 @@ function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
             //var promise1=reportinstance.retrieve().then(function(results) {
             var promise1 = waitForInstance(reportinstance, WAIT_BETWEEN_REQUESTS).then(function (results) {
                 console.log(t + ":Returned Range: " + st.format() + " - " + end.format() + ":" + results.attributes.status);
-                fs.writeFile('tmp/output-' + n + '.json', JSON.stringify(results));
+                // fs.writeFile('tmp/output-' + n + '.json', JSON.stringify(results));
                 writeResult(stringifier, results);
                 n = n + 1;
                 console.log(results.factMap["T!T"].aggregates[0].value + " records")
@@ -312,7 +312,7 @@ function writeResult(stringifier, results) {
     var rows = results.factMap["T!T"].rows;
 
     //console.log(rows.length);
-    fs.writeFile('data/rowsA.json', JSON.stringify(rows[0]));
+    // fs.writeFile('data/rowsA.json', JSON.stringify(rows[0]));
     
     for (var k = 0; k < rows.length; k++) {
         //console.log(JSON.stringify(rowval));
