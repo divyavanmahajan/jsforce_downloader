@@ -1,12 +1,89 @@
 # jsforce_downloader
 
-Extract report data from Salesforce. It can download more than 2000 rows. The report must have a standard date filter. The program will iterate day by day – changing the standard date filter – to download the results. Since Sync report runs have a daily limit, Async report runs are used instead. The program runs multiple days in parallel to speed up the process.
+Extract report data from Salesforce into a comma separated file.
 
-Why this library? The excellent [JSFORCE](https://www.npmjs.com/package/jsforce) node module is a great wrapper around the Salesforce REST API. However it does not have a simple way to repeatedly call a report to get more than 2000 results. (In case of SOQL, you can get more than 2000 results by making more calls to the next url that is returned). So I had to write a lot of non-trivial code to call the same report multiple times, switch to using asynchronous Salesforce reports, run multiple reports in parallel.
+## Features
+- Download more than 2000 details rows.
+- Only extracts the detail rows (T!T) and ignores all group/summary sections.
+- Exported as a CSV with the displayed value and the underlying value.
+- Asynchronous reports are used to avoid the Salesforce limit on synchronous reports per hour.
+- Parallel downloads to speed up the extract.
 
-This is written as a library first. Later I will add a command to run it from the command line.
 
-# Environment variables to login
+## Requirements
+- The report must have a standard date filter.
+
+## How to use it
+Install jsforce_downloader
+
+    npm install -g jsforce_downloader
+
+To download a report, you need
++ The report ID (get this from the Salesforce URL when you open the report).    
++ The name of the date field - e.g. Case.CreatedDate
++ The zero-based index of column that is displayed while extracting (helps you keep track of the progress.) If you aren't sure, use 0.
+
+      jsforce_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD}
+
+Example:
+
+      $ jsforce_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-05
+
+      Labor__c.CreatedDate 5 2016-01-01 2016-01-05
+      Starting here....
+      Report:00OE0000002wlroMAA
+      Output to:ReportOutput_2016-01-01_to_2016-01-05.csv
+      Start:2016-01-01
+      End:2016-05-01
+      Logged into Salesforce
+      username: sampleuser@sftest.com(Sample User)
+      0:Start Range: 2016-01-01T00:00:00-08:00 - 2016-01-01T23:59:59-08:00
+      1:Start Range: 2016-01-02T00:00:00-08:00 - 2016-01-02T23:59:59-08:00
+      2:Start Range: 2016-01-03T00:00:00-08:00 - 2016-01-03T23:59:59-08:00
+      3:Start Range: 2016-01-04T00:00:00-08:00 - 2016-01-04T23:59:59-08:00
+      4:Start Range: 2016-01-05T00:00:00-08:00 - 2016-01-05T23:59:59-08:00
+      1:Returned Range: 2016-01-02T00:00:00-08:00 - 2016-01-02T23:59:59-08:00:Success
+      84 records
+      First: L-5156083 a0iE000000MiTNLIA3
+      Last : L-5156837 a0iE000000MiUMMIA3
+      Package size:83
+      2:Returned Range: 2016-01-03T00:00:00-08:00 - 2016-01-03T23:59:59-08:00:Success
+      158 records
+      First: L-5156873 a0iE000000MiUWyIAN
+      Last : L-5158480 a0iE000000MiWMsIAN
+      Package size:157
+      0:Returned Range: 2016-01-01T00:00:00-08:00 - 2016-01-01T23:59:59-08:00:Success
+      142 records
+      First: L-5155835 a0iE000000MiSVAIA3
+      Last : L-5156078 a0iE000000MiTF1IAN
+      Package size:141
+      3:Returned Range: 2016-01-04T00:00:00-08:00 - 2016-01-04T23:59:59-08:00:Success
+      706 records
+      First: L-5158662 a0iE000000MiWcxIAF
+      Last : L-5172382 a0iE000000MihGAIAZ
+      Package size:705
+      4:Returned Range: 2016-01-05T00:00:00-08:00 - 2016-01-05T23:59:59-08:00:Success
+      665 records
+      First: L-5172547 a0iE000000MihJHIAZ
+      Last : L-5184790 a0iE000000Mir8jIAB
+      Package size:664
+      =============================
+      Report:00OE0000002wlroMAA
+      Date range:2016-01-01 to 2016-01-05
+      Output to:ReportOutput_2016-01-01_to_2016-01-05.csv
+      Done:1755 records written.
+      Async reports requested:5 - (succeeded:5,failed:0).
+
+
+This creates the file *ReportOutput_2016-01-01_to_2016-01-05.csv*.
+
+## How it works
+The program will iterate day by day – changing the standard date filter – to download the results. Since Salesforce synchronous report runs have a hourly limit, the reports are run asynchronously. The report is requested for multiple days in parallel to speed up the process.
+
+## Why this library?
+The excellent [jsForce](https://www.npmjs.com/package/jsforce) node module is a great wrapper around the Salesforce REST API. However it does not have a simple way to repeatedly call a report to get more than 2000 results. (In case of SOQL, you can get more than 2000 results by making more calls to the next url that is returned). So I had to write a lot of non-trivial code to call the same report multiple times, switch to using asynchronous Salesforce reports, run multiple reports in parallel.
+
+## Environment variables to login
 To run the library relies on the environment variables to store the username and password. This forces (me atleast!) to avoid hard coding it in scripts.
 
     SF_USER="myuseratsf@xyz.com"
