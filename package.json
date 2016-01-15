@@ -1,17 +1,34 @@
 {
-  "name": "hiss_utilization_etl",
-  "version": "1.0.0",
-  "description": "HISS Tableau Utilization Analytics ETL. Extract report data from Salesforce using the JSForce Node wrapper for Salesforce",
-  "main": "sf_async_reportdownload.js",
+  "name": "jsforce_downloader",
+  "version": "0.1.0",
+  "description": "Extract report data from Salesforce. It can download more than 2000 rows. The report must have a standard date filter. The program will iterate day by day – changing the standard date filter – to download the results. Since Sync report runs have a daily limit, Async report runs are used instead. The program runs multiple days in parallel to speed up the process.",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Divya Mahajan",
+  "repository": {
+    "type": "git",
+    "url": "git//github.com/divyavanmahajan/jsforce_downloader.git"
+  },
+  "keywords": [
+    "Salesforce",
+    "report",
+    "downloader",
+    "jsforce"
+  ],
+  "author": "Divya Mahajan <dvm@vanmahajan.com> (http://vanmahajan.github.io)",
+  "bugs": {
+    "url": "https://github.com/divyavanmahajan/jsforce_downloader/issues"
+  },
   "license": "ISC",
   "dependencies": {
-    "jsforce" : "*",
+    "jsforce": "*",
     "csv-stringify": "*",
-    "moment":"*",
-    "moment-range":"*"
+    "moment": "*",
+    "moment-range": "*"
+  },
+  "devDependencies": {
+    "chai": "^3.4.1",
+    "mocha": "^2.3.4"
   }
 }
