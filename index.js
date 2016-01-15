@@ -106,11 +106,11 @@ module.exports.downloadreport = function(_reportID,_datefield,_indexfieldOffset,
           return getReportForDateRange(StartDate, EndDate, "days");
       }, writeOutErrorFn('login')).then(function () {
           console.log("=============================");
-          console.log("Report:" + reportID);
-          console.log("Date range:" + StartDate.format('YYYY-MM-DD')+" to "+ EndDate.format('YYYY-MM-DD'));
-          console.log("Output to:" + OutputFile);
-          console.log('Done:' + global_written_count + " records written.");
-          console.log('Async reports requested:'+async_report_requests+' - (succeeded:'+async_report_success+',failed:'+(async_report_requests - async_report_success)+').')
+          console.log("Report       :" + reportID);
+          console.log("Date range   :" + StartDate.format('YYYY-MM-DD')+" to "+ EndDate.format('YYYY-MM-DD'));
+          console.log("Output to    :" + OutputFile);
+          console.log('Done         :' + global_written_count + " records written.");
+          console.log('Async reports:'+async_report_requests+' - (succeeded:'+async_report_success+',failed:'+(async_report_requests - async_report_success)+').')
       }, writeOutErrorFn('jsforce_report.downloadreport'))
       .catch(function (err) {
           console.error(err);
