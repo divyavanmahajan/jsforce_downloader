@@ -1,7 +1,7 @@
 {
   "name": "jsforce_downloader",
-  "version": "0.1.0",
-  "description": "Extract report data from Salesforce. It can download more than 2000 rows. The report must have a standard date filter. The program will iterate day by day – changing the standard date filter – to download the results. Since Sync report runs have a daily limit, Async report runs are used instead. The program runs multiple days in parallel to speed up the process.",
+  "version": "0.1.1",
+  "description": "Extract report data from Salesforce. Download more than 2000 rows, asynchronously. Report must have a standard date filter field to use for a date range.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
