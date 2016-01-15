@@ -1,0 +1,17 @@
+{
+  "name": "hiss_utilization_etl",
+  "version": "1.0.0",
+  "description": "HISS Tableau Utilization Analytics ETL. Extract report data from Salesforce using the JSForce Node wrapper for Salesforce",
+  "main": "sf_async_reportdownload.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Divya Mahajan",
+  "license": "ISC",
+  "dependencies": {
+    "jsforce" : "*",
+    "csv-stringify": "*",
+    "moment":"*",
+    "moment-range":"*"
+  }
+}
