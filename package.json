@@ -20,6 +20,9 @@
   "bugs": {
     "url": "https://github.com/divyavanmahajan/jsforce_downloader/issues"
   },
+  "bin": {
+    "jsforce_report": "./bin/jsforce_report"
+  },
   "license": "ISC",
   "dependencies": {
     "jsforce": "*",
