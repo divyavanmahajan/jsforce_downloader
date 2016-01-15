@@ -18,9 +18,9 @@ var datefield;
 var indexfieldOffset=0;
 var StartDate = moment();
 var EndDate = moment();
-
+var lastUpdate = moment();
 // Internal global state
-var OutputFile = 'ReportOutput_' + StartDate.format("YYYY-MM-DD") + '_to_' + EndDate.format("YYYY-MM-DD") + '.csv';
+var OutputFile = 'ReportOutput.csv';
 var WAIT_BETWEEN_REQUESTS = 3000; // 3 seconds
 var UserName = process.env.SF_USER;
 var SFPassToken = process.env.SF_PASSWD_WITH_TOKEN;
@@ -74,6 +74,7 @@ module.exports.downloadreport = function(_reportID,_datefield,_indexfieldOffset,
   indexfieldOffset=_indexfieldOffset;
   StartDate=moment(_startDate);
   EndDate=moment(_endDate);
+  lastUpdate=moment();
   UserName = _username;
   SFPassToken = _password;
 
@@ -85,7 +86,7 @@ module.exports.downloadreport = function(_reportID,_datefield,_indexfieldOffset,
   n = 0;
 
 
-  OutputFile = 'data/ReportOutput_' + StartDate.format("YYYY-MM-DD") + '_to_' + EndDate.format("YYYY-MM-DD") + '.csv';
+  OutputFile = 'ReportOutput_' + StartDate.format("YYYY-MM-DD") + '_to_' + EndDate.format("YYYY-MM-DD") + '.csv';
 
   conn.login(UserName, SFPassToken).
       then(function () {
@@ -105,11 +106,10 @@ module.exports.downloadreport = function(_reportID,_datefield,_indexfieldOffset,
           return getReportForDateRange(StartDate, EndDate, "days");
       }, writeOutErrorFn('login')).then(function () {
           console.log("=============================");
-          console.log("Output to:" + OutputFile);
-          console.log("Start:" + StartDate);
-          console.log("End:" + EndDate);
           console.log("Report:" + reportID);
-          console.log('Done:' + global_record_count + " records, " + global_written_count + " written.");
+          console.log("Date range:" + StartDate.format('YYYY-MM-DD')+" to "+ EndDate.format('YYYY-MM-DD'));
+          console.log("Output to:" + OutputFile);
+          console.log('Done:' + global_written_count + " records written.");
           console.log('Async reports requested:'+async_report_requests+' - (succeeded:'+async_report_success+',failed:'+(async_report_requests - async_report_success)+').')
       }, writeOutErrorFn('jsforce_report.downloadreport'))
       .catch(function (err) {
@@ -318,7 +318,7 @@ function writeResult(stringifier, results) {
         //console.log(JSON.stringify(rowval));
         //console.log('Writeresult:'+k);
         var datacells = rows[k]["dataCells"];
-        var rowout = [moment().format()]; // Updated right now!
+        var rowout = [lastUpdate.format()]; // Update date/time - is the same as the start of the download.
         var k1;
         for (k1 = 0; k1 < datacells.length; k1++) {
             rowout.push(datacells[k1].label);
