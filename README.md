@@ -81,7 +81,11 @@ This creates the file *ReportOutput_2016-01-01_to_2016-01-05.csv*.
 The program will iterate day by day – changing the standard date filter – to download the results. Since Salesforce synchronous report runs have a hourly limit, the reports are run asynchronously. The report is requested for multiple days in parallel to speed up the process.
 
 ## Why this library?
-The excellent [jsForce](https://www.npmjs.com/package/jsforce) node module is a great wrapper around the Salesforce REST API. However it does not have a simple way to repeatedly call a report to get more than 2000 results. (In case of SOQL, you can get more than 2000 results by making more calls to the next url that is returned). So I had to write a lot of non-trivial code to call the same report multiple times, switch to using asynchronous Salesforce reports, run multiple reports in parallel.
+I needed to automate the download of a large report to a CSV file. This task was done manually earlier and would take a long time to complete. So I looked into options using Node.
+
+The excellent [jsForce](https://www.npmjs.com/package/jsforce) node module is a great wrapper around the Salesforce REST API. However it does not have a simple way to repeatedly call a report to get more than 2000 results. Unlike SOQL queries, there is no "queryMore" equivalent for reports. So I had to write a lot of non-trivial code to call the same report multiple times, switch to using asynchronous Salesforce reports, run multiple reports in parallel, etc.
+
+This hopefully would help others too, so I'm sharing the module with you.
 
 ## Environment variables to login
 To run the library relies on the environment variables to store the username and password. This forces (me atleast!) to avoid hard coding it in scripts.
