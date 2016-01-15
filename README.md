@@ -13,10 +13,21 @@ Extract report data from Salesforce into a comma separated file.
 ## Requirements
 - The report must have a standard date filter.
 
-## How to use it
-Install jsforce_downloader
+## How to install
+Install jsforce_downloader and jsforce_downloader_metadata.
 
     npm install -g jsforce_downloader
+
+## How to run jsforce_downloader_metadata
+
+This will display all the columns and filters of a report. The metadata is saved as a JSON file.
+
+    jsforce_downloader_metadata {reportid}
+    jsforce_downloader_metadata 00OE0000002wlroMAA
+
+This creates the file *ReportOutput_00OE0000002wlroMAA.json*.
+
+## How to run jsforce_downloader
 
 To download a report, you need
 + The report ID (get this from the Salesforce URL when you open the report).    
@@ -76,6 +87,8 @@ Example:
 
 
 This creates the file *ReportOutput_2016-01-01_to_2016-01-05.csv*.
+
+##
 
 ## How it works
 The program will iterate day by day – changing the standard date filter – to download the results. Since Salesforce synchronous report runs have a hourly limit, the reports are run asynchronously. The report is requested for multiple days in parallel to speed up the process.

@@ -1,6 +1,6 @@
 {
   "name": "jsforce_downloader",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Extract report data from Salesforce. Download more than 2000 rows, asynchronously. Report must have a standard date filter field to use for a date range.",
   "main": "index.js",
   "scripts": {
@@ -21,7 +21,8 @@
     "url": "https://github.com/divyavanmahajan/jsforce_downloader/issues"
   },
   "bin": {
-    "jsforce_downloader": "./bin/jsforce_downloader"
+    "jsforce_downloader": "./bin/jsforce_downloader",
+    "jsforce_downloader_metadata": "./bin/jsforce_downloader_metadata"
   },
   "license": "ISC",
   "dependencies": {
