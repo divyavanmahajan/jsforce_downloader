@@ -1,5 +1,5 @@
 /* global process */
-/*global Buffer */
+/* global Buffer */
 /**
  * @file Report downloader class which provides a single function to download a salesforce report.
  * @author Divya van Mahajan <dvm@vanmahajan.com>
@@ -33,8 +33,8 @@ var global_record_count = 0;
 var global_written_count = 0;
 
 var conn = new jsforce.Connection();
-
-
+module.exports.MAX_CONCURRENT = 20;
+module.exports.reportsection = "T!T"; //0_0!0_0
 /**
  * Download the report. Command line wrapper
  * SF_USER - Environment variable with the user name.
@@ -45,11 +45,20 @@ var conn = new jsforce.Connection();
  */
 module.exports.downloadCommand = function () {
     if (process.argv.length < 7) {
-        console.error('Usage: ' + process.argv[0] + ' ' + process.argv[1] + ' reportid datefield indexfieldOffset 2016-01-01 2016-01-05');
+        console.error('Usage: ' + process.argv[0] + ' ' + process.argv[1] + ' reportid datefield indexfieldOffset 2016-01-01 2016-01-05 [10, [T!T]]');
+        console.error('\t10 - Number of concurrent requests.');
+        console.error('\tT!T - The report section that should be downloaded.');
+        console.error('\n\tIf you create a tmp directory, the raw json output from the report will be stored in that directory');
         return;
     } else {
+        if (typeof process.argv[7]==="number") {
+            module.exports.MAX_CONCURRENT=process.argv[7];
+        }
+        if (typeof process.argv[8]==="string") {
+            module.exports.reportsection=process.argv[8];
+        }
         module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4],
-            process.argv[5], process.argv[6], process.env.SF_USER, process.env.SF_PASSWD_WITH_TOKEN);
+            process.argv[5], process.argv[6], process.env.SF_USER, process.env.SF_PASSWD_WITH_TOKEN, process.argv[7]);
     }
 }
 
@@ -72,8 +81,8 @@ module.exports.downloadreport = function (_reportID, _datefield, _indexfieldOffs
     reportID = _reportID;
     datefield = _datefield;
     indexfieldOffset = _indexfieldOffset;
-    StartDate = moment(_startDate);
-    EndDate = moment(_endDate);
+    StartDate = moment(_startDate,"YYYY-MM-DD");
+    EndDate = moment(_endDate,"YYYY-MM-DD");
     lastUpdate = moment();
     UserName = _username;
     SFPassToken = _password;
@@ -86,7 +95,7 @@ module.exports.downloadreport = function (_reportID, _datefield, _indexfieldOffs
     n = 0;
 
 
-    OutputFile = 'ReportOutput_' + StartDate.format("YYYY-MM-DD") + '_to_' + EndDate.format("YYYY-MM-DD") + '.csv';
+    OutputFile = 'ReportOutput_' + _reportID + '_' + StartDate.format("YYYY-MM-DD") + '_to_' + EndDate.format("YYYY-MM-DD") + '.csv';
 
     conn.login(UserName, SFPassToken).
         then(function () {
@@ -118,8 +127,8 @@ module.exports.downloadreport = function (_reportID, _datefield, _indexfieldOffs
     console.log("Starting here....");
     console.log("Report:" + reportID);
     console.log("Output to:" + OutputFile);
-    console.log("Start:" + StartDate.format('YYYY-DD-MM'));
-    console.log("End:" + EndDate.format('YYYY-DD-MM'));
+    console.log("Start:" + StartDate.format('YYYY-MM-DD'));
+    console.log("End:" + EndDate.format('YYYY-MM-DD'));
 }
 
 
@@ -171,15 +180,15 @@ function getReportForDateRange(startdate, enddate, interval) {
                         processAsyncReportInstanceFn(instances, t, st, end, stringifier)
                         , writeOutErrorFn(t + ":Error starting report for range: " + start.format() + " - " + end.format() + ":"));
                     return promise2;
-                });
+                },writeOutErrorFn(t + ":Error running report for range: " + start.format() + " - " + end.format() + ":"));
             }
             j = (j + 1) % MAX_CONCURRENT;
             async_report_requests++;
         });
         return Promise.all(concurrentPromises).then(function () {
             stringifier.end();
-        });
-    });
+        },writeOutErrorFn("PromiseAll error"));
+    },writeOutErrorFn("PrepareCSV error"));
     return promise;
 }
 
@@ -251,21 +260,36 @@ function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
         var promise0 = delay(WAIT_BETWEEN_REQUESTS).then(function () {
             //var promise1=reportinstance.retrieve().then(function(results) {
             var promise1 = waitForInstance(reportinstance, WAIT_BETWEEN_REQUESTS).then(function (results) {
-                console.log(t + ":Returned Range: " + st.format() + " - " + end.format() + ":" + results.attributes.status);
-                // fs.writeFile('tmp/output-' + n + '.json', JSON.stringify(results));
+                var message = "";
+                if (typeof results.factMap[module.exports.reportsection]==="undefined" ||
+                    results.factMap[module.exports.reportsection].rows.length==0)
+                    {
+                        message = "No data in section " + module.exports.reportsection;
+                        fs.writeFile('tmp/empty-' + n + '.json', JSON.stringify(results));
+                    } else {
+                        message = results.factMap[module.exports.reportsection].rows.length + " rows in section "+ module.exports.reportsection;
+                        fs.writeFile('tmp/output-' + n + '.json', JSON.stringify(results));
+                    }
+                console.log(t + ":Returned Range: " + st.format() + " - " + end.format() + ":" + results.attributes.status +":"+message);
+                if (typeof results.factMap[module.exports.reportsection] === "undefined") {
+                    return;
+                }
+                if (results.factMap[module.exports.reportsection].rows.length==0) {
+                    return;
+                }
                 writeResult(stringifier, results);
                 n = n + 1;
-                console.log(results.factMap["T!T"].aggregates[0].value + " records")
-
-                var firstrow = results.factMap["T!T"].rows[0].dataCells[indexfieldOffset];
-                var lastrow = results.factMap["T!T"].rows.pop().dataCells[indexfieldOffset];
+                console.log(results.factMap[module.exports.reportsection].aggregates[0].value + " records");
+                
+                var firstrow = results.factMap[module.exports.reportsection].rows[0].dataCells[indexfieldOffset];
+                var lastrow = results.factMap[module.exports.reportsection].rows.pop().dataCells[indexfieldOffset];
                 //console.log(JSON.stringify(lastrow));
                 var label = lastrow.label;
                 var val = lastrow.value;
                 console.log("First row: (" + firstrow.label + "," + firstrow.value + ")");
                 console.log("Last row : (" + label + " " + val + ")");
-                //console.log("Package size:" + results.factMap["T!T"].rows.length);
-                global_record_count = global_record_count + results.factMap["T!T"].rows.length;
+                //console.log("Package size:" + results.factMap[module.exports.reportsection].rows.length);
+                global_record_count = global_record_count + results.factMap[module.exports.reportsection].rows.length;
                 if (results.allData == false) {
                     console.error(t + ":Incomplete results for range:" + st.format() + " - " + end.format());
                 }
@@ -308,26 +332,31 @@ function delay(time) {
 
 function writeResult(stringifier, results) {
     //console.log('Writeresult:'+stringifier);
-    var rows = results.factMap["T!T"].rows;
+    var rows = results.factMap[module.exports.reportsection].rows;
+    if (rows.length==0) return;
 
     //console.log(rows.length);
     // fs.writeFile('data/rowsA.json', JSON.stringify(rows[0]));
-    
-    for (var k = 0; k < rows.length; k++) {
-        //console.log(JSON.stringify(rowval));
-        //console.log('Writeresult:'+k);
-        var datacells = rows[k]["dataCells"];
-        var rowout = [lastUpdate.format()]; // Update date/time - is the same as the start of the download.
-        var k1;
-        for (k1 = 0; k1 < datacells.length; k1++) {
-            rowout.push(datacells[k1].label);
-            rowout.push(datacells[k1].value);
+    try {
+        for (var k = 0; k < rows.length; k++) {
+            //console.log(JSON.stringify(rowval));
+            //console.log('Writeresult:'+k);
+            var datacells = rows[k]["dataCells"];
+            var rowout = [lastUpdate.format()]; // Update date/time - is the same as the start of the download.
+            var k1;
+            for (k1 = 0; k1 < datacells.length; k1++) {
+                rowout.push(datacells[k1].label);
+                rowout.push(datacells[k1].value);
+            }
+            //console.log(JSON.stringify(rowout));
+            stringifier.write(rowout);
+            //console.log('Writeresult1:'+k);
         }
-        //console.log(JSON.stringify(rowout));
-        stringifier.write(rowout);
-        //console.log('Writeresult1:'+k);
+        global_written_count = global_written_count + rows.length;
+        
+    } catch (error) {
+        console.error("Writing CSV:"+error);        
     }
-    global_written_count = global_written_count + rows.length;
 
     //	console.log('Writeresult:done');
 

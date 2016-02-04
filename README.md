@@ -26,19 +26,36 @@ This will display all the columns and filters of a report. The metadata is saved
     jsforce_downloader_metadata 00OE0000002wlroMAA
 
 This creates the file *ReportOutput_00OE0000002wlroMAA.json*.
+This file has the metadata for the report - so you can easily find the index of the column to display, {Report Section of the Fact Map} and report filters.
+
 
 ## How to run jsforce_downloader
 
-To download a report, you need
+Preparation to download a report, you need
 + The report ID (get this from the Salesforce URL when you open the report).    
-+ The name of the date field - e.g. Case.CreatedDate
++ The name of the date field - e.g. Case.CreatedDate to slice up the report into daily chunks. This does not have to be in the report.
 + The zero-based index of column that is displayed while extracting (helps you keep track of the progress.) If you aren't sure, use 0.
++ The section of the report that you want to see. This is explained in the [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) - in the section decode the Fact Map. 
+  The pattern for the fact map keys varies by report format as shown in this table.
+  
+Report Fact map key pattern format
+   Tabular    T!T: The grand total of a report. Both record data values and the grand total are represented by this key. 
+   Summary    <First level row grouping_second level row grouping_third level row grouping>!T: T refers to the row grand total.
+   Matrix     <First level row grouping_second level row grouping>!<First level column grouping_second level column grouping>.
+   
+   Each item in a row or column grouping is numbered starting with 0. Here are some examples of fact map keys:
+     + 0!T The first item in the first-level grouping.
+     + 1!T The second item in the first-level grouping.
+     + 0_0!T The first item in the first-level grouping and the first item in the second-level grouping. 0_1!T The first item in the first-level grouping and the second item in the second-level grouping. 
 
-      jsforce_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD}
+      
+    
+To download a report, you need
+      jsforce_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD} [{MAX_Concurrent} [{Report section of the Fact Map}]]
 
 Example:
 
-      $ jsforce_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-05
+      $ jsforce_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-05 4 'T!T'
 
       Labor__c.CreatedDate 5 2016-01-01 2016-01-05
       Starting here....
