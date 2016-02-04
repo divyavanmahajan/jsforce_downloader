@@ -8,10 +8,12 @@ Extract report data from Salesforce into a comma separated file.
 - Exported as a CSV with the displayed value and the underlying value.
 - Asynchronous reports are used to avoid the Salesforce limit on synchronous reports per hour.
 - Parallel downloads to speed up the extract.
+- Supports Tabular, Matrix and Summary report types.
 
 
 ## Requirements
-- The report must have a standard date filter.
+- The underlying object must have a date field that can be used as a standard date filter.
+- Typically this can be the object's CreatedDate.
 
 ## How to install
 Install jsforce_downloader and jsforce_downloader_metadata.
