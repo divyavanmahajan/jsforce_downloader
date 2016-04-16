@@ -58,7 +58,7 @@ module.exports.downloadCommand = function () {
             module.exports.reportsection=process.argv[8];
         }
         module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4],
-            process.argv[5], process.argv[6], process.env.SF_USER, process.env.SF_PASSWD_WITH_TOKEN, process.argv[7]);
+            process.argv[5], process.argv[6], process.env.SF_USER, process.env.SF_PASSWD_WITH_TOKEN);
     }
 }
 
