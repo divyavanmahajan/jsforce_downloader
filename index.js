@@ -62,6 +62,9 @@ module.exports.downloadCommand = function () {
     }
 }
 
+module.exports.downloadreport_file = function (_reportID, _startDate, _endDate)  {
+    return 'ReportOutput_' + _reportID + '_' + StartDate.format("YYYY-MM-DD") + '_to_' + EndDate.format("YYYY-MM-DD") + '.csv';
+}
 /**
  * Download the report.
  *
@@ -75,6 +78,7 @@ module.exports.downloadCommand = function () {
  * @param {String} _password - password with security token.
  * @param {Object} SFOptions - Initialization options for jsforce (see http://jsforce.github.io/jsforce/doc/Connection.html)
  */
+
 module.exports.downloadreport = function (_reportID, _datefield, _indexfieldOffset, _startDate, _endDate, _username, _password, SFOptions) {
     conn = new jsforce.Connection(SFOptions);
 
@@ -95,7 +99,7 @@ module.exports.downloadreport = function (_reportID, _datefield, _indexfieldOffs
     n = 0;
 
 
-    OutputFile = 'ReportOutput_' + _reportID + '_' + StartDate.format("YYYY-MM-DD") + '_to_' + EndDate.format("YYYY-MM-DD") + '.csv';
+    OutputFile = module.exports.downloadreport_file(_reportID,_startDate,_endDate);
 
     conn.login(UserName, SFPassToken).
         then(function () {
