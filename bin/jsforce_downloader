@@ -1,3 +1,5 @@
 #!/usr/bin/env node
 var cli = require('../index.js');
+cli.initialize();
+cli.initialize({});
 cli.downloadCommand();

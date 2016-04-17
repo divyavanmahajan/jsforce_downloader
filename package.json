@@ -29,7 +29,8 @@
     "jsforce": "*",
     "csv-stringify": "*",
     "moment": "*",
-    "moment-range": "*"
+    "moment-range": "*",
+    "aws-sdk": "*"
   },
   "devDependencies": {
     "chai": "^3.4.1",
