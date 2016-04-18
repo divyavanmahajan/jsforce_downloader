@@ -1,4 +1,5 @@
-# jsforce_downloader
+# jsforce_downloader 
+## by Divya van Mahajan
 
 Extract report data from Salesforce into a comma separated file. This package includes 4 components that can be used independently.
 - nodejs library to download Salesforce reports that have a date filter.
@@ -20,35 +21,37 @@ Report your issues or ask for feature requests at [Github Issues](https://github
 
 ## How to install
 Install jsforce_downloader and jsforce_downloader_metadata.
-
+```
     npm install -g jsforce_downloader
-
+```
 Optionally - if you are using the AWS S3 feature, install the AWS SDK and set environment variables AWS_ACCESS_KEY, AWS_SECRET_KEY.
-
+```
     npm install -g aws-sdk
-    
-## Environment variables to login
+```    
+## Setup: Environment variables
 The library and utilities rely on the environment variables to store the username and password. If you are writing your own nodejs program, you can pass these during initialization.
-
+```
     SF_USER="myuseratsf@xyz.com"
     SF_PASSWD_WITH_TOKEN="password";
+```
+If you are saving the output to S3 (OUTPUTTO="s3"), you should set the following environment variables.
+```
+    AWS_ACCESS_KEY="access key id"
+    AWS_SECRET_KEY="secret for access key"
+```    
+The security token is required since the app does not support OAuth sign in. 
+To get your security token, logon to Salesforce. 
+At the top navigation bar go to `your name > Setup > Personal Setup > My Personal Information > Reset My Security Token`.
+To use your token, if your password is mypassword, and your security token is `XXXXXXXXXX`, then set `SF_PASSWD_WITH_TOKEN` to `mypasswordXXXXXXXXXX` to log in. 
+If you change your password, the security token is reset and sent to your email.
 
-The security token is required since the app does not support OAuth sign in. To get your security token, logon to Salesforce. At the top navigation bar go to your name > Setup > Personal Setup > My Personal Information > Reset My Security Token.
-
-To use your token, if your password is mypassword, and your security token is XXXXXXXXXX, then set SF_PASSWD_WITH_TOKEN to "mypasswordXXXXXXXXXX" to log in. 
-Your security token is reset and sent to your email whenever you change your password.
-
-On the Mac OS X, I add the following lines to ~/.profile and restart Terminal.
-
+Mac OS X: Add the following lines to ~/.profile and restart Terminal.
+```sh
     export SF_USER="myuser@sfdomain.com"
     export SF_PASSWD_WITH_TOKEN="passwordTOKEN"
-
-In Windows, you can follow the [instructions to set environment variables](http://www.computerhope.com/issues/ch000549.htm). Restart your command or Powershell window after you set the environment variables.
-
-If you are saving the output to S3 (OUTPUTTO="s3"), you should set the following environment variables.
-    export AWS_ACCESS_KEY="access key id"
-    export AWS_SECRET_KEY="secret for access key"
-
+```
+Windows:Follow the [instructions to set environment variables](http://www.computerhope.com/issues/ch000549.htm). 
+Restart your command or Powershell window after you set the environment variables.
 
 ## Command line tools: How to run jsforce_downloader_metadata
 
@@ -72,148 +75,148 @@ The tool also creates a helper sql file `ReportSQL_00OE0000002wlroMAA.sql`. It c
 
 ## Command line tools: How to run jsforce_downloader
 Command line: To download a report
+
 `jsforce_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD} [{MAX_Concurrent} [{Report section of the Fact Map}]]`
 
 
-Preparation to download a report, you need
+### Preparation to download a report, you need
 + The report ID (get this from the Salesforce URL when you open the report).    
 + The name of the date field - e.g. Case.CreatedDate to slice up the report into daily chunks. This does not have to be in the report.
 + The zero-based index of column that is displayed while extracting (helps you keep track of the progress.) If you aren't sure, use 0.
-+ The section of the report that you want to see. This is explained in the [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) - in the section decode the Fact Map. 
-  The pattern for the fact map keys varies by report format as shown in this table.
++ The section of the report that you want to see. For a tabular report use "T!T". For others, see the next section (`Selecting the report section`).
   
-#### Report Fact map key pattern format
+  
+Example:
+```
+$ jsforce_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-05 4 'T!T'
+    Starting here....
+    Report:00OE0000002wlroMAA
+    Output to:ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312
+    Start:2016-01-01
+    End:2016-05-01
+    Logged into Salesforce
+    username: sampleuser@sftest.com(Sample User)
+    Report name: Case Owner Email
+    0:Start Range: 2016-01-01T00:00:00-08:00 - 2016-01-01T23:59:59-08:00
+    1:Start Range: 2016-01-02T00:00:00-08:00 - 2016-01-02T23:59:59-08:00
+    ....
+    1:Returned Range: 2016-01-02T00:00:00-08:00 - 2016-01-02T23:59:59-08:00:Success
+    84 records
+    First: L-5156083 a0iE000000MiTNLIA3
+    Last : L-5156837 a0iE000000MiUMMIA3
+    Package size:83
+    ....
+    =============================
+    Report:00OE0000002wlroMAA
+    Date range:2016-01-01 to 2016-01-05
+    Output to:ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312
+    Done:1755 records written.
+    Async reports requested:5 - (succeeded:5,failed:0).
+```
+
+This creates the file `ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312.csv`.
+
+### Selecting the report section
+ The report section to extract is explained in the [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) 
+ - in the section "`Decode the Fact Map`". The pattern for the fact map keys varies by report format as shown in this table.
    Tabular    T!T: The grand total of a report. Both record data values and the grand total are represented by this key. 
    Summary    <First level row grouping_second level row grouping_third level row grouping>!T: T refers to the row grand total.
    Matrix     <First level row grouping_second level row grouping>!<First level column grouping_second level column grouping>.
    
-   Each item in a row or column grouping is numbered starting with 0. Here are some examples of fact map keys:
-   
+Each item in a row or column grouping is numbered starting with 0. Here are some examples of fact map keys:
+
      0!T   | The first item in the first-level grouping.
      1!T   | The second item in the first-level grouping.
      0_0!T | The first item in the first-level grouping and the first item in the second-level grouping. 
      0_1!T | The first item in the first-level grouping and the second item in the second-level grouping. 
 
-Example:
-```
-      $ jsforce_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-05 4 'T!T'
-
-      Labor__c.CreatedDate 5 2016-01-01 2016-01-05
-      Starting here....
-      Report:00OE0000002wlroMAA
-      Output to:ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312
-      Start:2016-01-01
-      End:2016-05-01
-      Logged into Salesforce
-      username: sampleuser@sftest.com(Sample User)
-      0:Start Range: 2016-01-01T00:00:00-08:00 - 2016-01-01T23:59:59-08:00
-      1:Start Range: 2016-01-02T00:00:00-08:00 - 2016-01-02T23:59:59-08:00
-      2:Start Range: 2016-01-03T00:00:00-08:00 - 2016-01-03T23:59:59-08:00
-      3:Start Range: 2016-01-04T00:00:00-08:00 - 2016-01-04T23:59:59-08:00
-      4:Start Range: 2016-01-05T00:00:00-08:00 - 2016-01-05T23:59:59-08:00
-      1:Returned Range: 2016-01-02T00:00:00-08:00 - 2016-01-02T23:59:59-08:00:Success
-      84 records
-      First: L-5156083 a0iE000000MiTNLIA3
-      Last : L-5156837 a0iE000000MiUMMIA3
-      Package size:83
-      ....
-      4:Returned Range: 2016-01-05T00:00:00-08:00 - 2016-01-05T23:59:59-08:00:Success
-      665 records
-      First: L-5172547 a0iE000000MihJHIAZ
-      Last : L-5184790 a0iE000000Mir8jIAB
-      Package size:664
-      =============================
-      Report:00OE0000002wlroMAA
-      Date range:2016-01-01 to 2016-01-05
-      Output to:ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312
-      Done:1755 records written.
-      Async reports requested:5 - (succeeded:5,failed:0).
-```
-
-This creates the file *ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312.csv*.
 
 ## Command line tools: How to run jsforce_s3_downloader
 To download a report, you need
-      jsforce_s3_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD} {s3 bucket} {s3 path} [{aws region}]
+
+`jsforce_s3_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD} {s3 bucket} {s3 path} [{aws region}]`
 
 Example:
 
 ```
 $ jsforce_s3_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-04 monima test us-east-1
-Switching AWS region to us-east-1
-Starting here....
-Report:00OE0000002wlroMAA
-Output to:ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
-Start:2016-01-01
-...
-707 records
-First row: (L-5158662,a0iE000000MiWcxIAF)
-Last row : (L-5172382 a0iE000000MihGAIAZ)
-=============================
-Report       :00OE0000002wlroMAA
-Date range   :2016-01-01 to 2016-01-04
-Output to    :ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
-Done         :1087 records written.
-Async reports:4 - (succeeded:4,failed:0).
-Successfully uploaded data to monima/monima/ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
+    Switching AWS region to us-east-1
+    Starting here....
+    Report:00OE0000002wlroMAA
+    Output to:Upload to: s3://monima/test/ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
+    Start:2016-01-01
+    ...
+    707 records
+    First row: (L-5158662,a0iE000000MiWcxIAF)
+    Last row : (L-5172382 a0iE000000MihGAIAZ)
+    =============================
+    Report       :00OE0000002wlroMAA
+    Date range   :2016-01-01 to 2016-01-04
+    Output to    :ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
+    Done         :1087 records written.
+    Async reports:4 - (succeeded:4,failed:0).
+    Successfully uploaded data to s3://monima/monima/ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
 ```
-
-
+This uploads the file `ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv` to the S3 bucket `monima`.
 
 ## Using the library in your NodeJS program.
 
 
 #### Configuration of the library
+Before you can use the report download function, you must initialize the library by calling jsforce_downloader.initialize.
 ```javascript
-var config = {
-    MAX_CONCURRENT: 30, 
-    // 30 parallel async report requests
-    
-    WAIT_BETWEEN_REQUESTS: 1000, 
-    // 1000 milliseconds
-    
-    REPORTSECTION: "T!T", 
-    // REPORTSECTION - The section of the report that you want to see. This is explained in the 
-    // [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) 
-    // - in the section decode the Fact Map. 
-    
-    WRITE_TEMP_FILES: !fs.existsSync('./tmp'), 
-    // Store output of each async report to the tmp subdirectory.
-    
-    SFOptions: {
-        loginUrl: "https://login.salesforce.com"
-    }, 
-    // Initialization options for jsforce (see http://jsforce.github.io/jsforce/doc/Connection.html)
-    
-    SF_USER: process.env.SF_USER,
-    SF_PASSWD_WITH_TOKEN: process.env.SF_PASSWD_WITH_TOKEN,
-    
-    REPORTPREFIX: "ReportOut_",
-    // File name generated is REPORTPREFIX + reportid + startdate + enddate + execution timestamp
-    
-    OUTPUTTO: "file", 
-    // This can be 'file' - to write results to a file; or 's3' - to write results to a S3 object.
-    
-
-    GZIP: false,
-    // If set to true, this will use GZIP to compress the output file
-
-    AWSCONFIG: {    
-        accessKeyId: 'AKID', secretAccessKey: 'SECRET', region: 'us-west-2'
-    }, 
-    // This is required when you are using AWS S3 outside AWS Lambda and have not set the environment variables AWS_ACCESS_KEY and AWS_SECRET_KEY.  
-    // See http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/Config.html#constructor-property
+    var jsforce_downloader=require('jsforce_downloader');
+    var config = {
+        MAX_CONCURRENT: 30, 
+        // 30 parallel async report requests
         
-    S3BUCKET: "", 
-    // S3 bucket if OUTPUTTO is set to "s3".
+        WAIT_BETWEEN_REQUESTS: 1000, 
+        // 1000 milliseconds
+        
+        REPORTSECTION: "T!T", 
+        // REPORTSECTION - The section of the report that you want to see. This is explained in the 
+        // [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) 
+        // - in the section decode the Fact Map. 
+        
+        WRITE_TEMP_FILES: !fs.existsSync('./tmp'), 
+        // Store output of each async report to the tmp subdirectory.
+        
+        SFOptions: {
+            loginUrl: "https://login.salesforce.com"
+        }, 
+        // Initialization options for jsforce (see http://jsforce.github.io/jsforce/doc/Connection.html)
+        
+        SF_USER: process.env.SF_USER,
+        SF_PASSWD_WITH_TOKEN: process.env.SF_PASSWD_WITH_TOKEN,
+        
+        REPORTPREFIX: "ReportOut_",
+        // File name generated is REPORTPREFIX + reportid + startdate + enddate + execution timestamp
+        
+        OUTPUTTO: "file", 
+        // This can be 'file' - to write results to a file; or 's3' - to write results to a S3 object.
+        
+
+        GZIP: false,
+        // If set to true, this will use GZIP to compress the output file
+
+        AWSCONFIG: {    
+            accessKeyId: 'AKID', secretAccessKey: 'SECRET', region: 'us-west-2'
+        }, 
+        // This is required when you are using AWS S3 outside AWS Lambda and have not set the environment variables AWS_ACCESS_KEY and AWS_SECRET_KEY.  
+        // See http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/Config.html#constructor-property
+            
+        S3BUCKET: "", 
+        // S3 bucket if OUTPUTTO is set to "s3".
+        
+        S3KEYPREFIX: "" 
+        // S3 key prefix if OUTPUTTO is set to "s3". This is the path where you want to store the output file.
+    };
+    jsforce_downloader.initialize(config);
     
-    S3KEYPREFIX: "" 
-    // S3 key prefix if OUTPUTTO is set to "s3". This is the path where you want to store the output file.
-}
 ```
 #### Using the library
 
-`jsforce_downloader.downloadreport` : is the key function. It will download the report. The function returns a promise.
+`jsforce_downloader.downloadreport` : is the main function that downloads the report. The function returns a Javascript promise.
 
 ```javascript
 /**
@@ -230,7 +233,6 @@ var config = {
  Example:
  
 ```javascript
-    jsforce_downloader.initialize(config);
     jsforce_downloader.downloadreport(report, "Datefield", options.indexfield, options.startdate, options.enddate).then(
         function(res) {
             console.log(jsforce_downloader.s3outputkey);
@@ -249,7 +251,7 @@ var config = {
 
 `config`         | Config for the module.
 `s3outputkey`    | S3 URL if output is to S3.
-`result`         | CSV data set.
+`result`         | CSV data set on success.
 `reportName`     | Name of the report from the metadata.
 `reportDescribe` | JSON metadata returned by report.describe()
 
@@ -391,78 +393,99 @@ Successfully uploaded data to s3://monima/jsforce/LambdaReportOut_00OE0000002whw
 If you want to use the Web console, you don't need the AWS CLI. [Instructions for CLI setup](http://docs.aws.amazon.com/lambda/latest/dg/setup-awscli.html).
 + Amazon has documented the process in their document ["Creating a Deployment Package (Node.js)".](http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html)
 
-+ From the `myfunction` directory, run the following on the command line.
-Alternatively download [function.zip](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/function.zip).
++ Copy the following into the `makelambda.sh` script in the `myfunction` directory. Alternatively download and edit this script [makelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/makelambda.sh).
 
 ```
+#!/bin/sh
+ARN=arn:aws:iam::852391518417:role/lambda_basic_execution
+LAMBDAFN=DownloadSFReport
+EVENTFILE=./event.json
+AWSPROFILE=adminuser
+
+echo -- 1. Make function.zip --
 rm function.zip
 zip -rq function index.js node_modules -x node_modules/aws-sdk/*\* -x node_modules/jsforce/build/*\* -x node_modules/jsforce/test/*\*
 
-```
-+ This will create a ZIP file for your lambda function and exclude the test.js file which has your credentials.
-+ Get the ARN for the Lambda role "lambda_basic_execution" or "lambda_basic_execution_with_vpc".
-[IAM Home](https://console.aws.amazon.com/iam/home). View the details of the role and copy down its ARN. 
-It would look similar to `arn:aws:iam::854421518417:role/lambda_basic_execution`.
-
-+ Create a lambda function with 300 seconds timeout, upload the function.zip file.
-[Amazon docs on creating a Lambda function](http://docs.aws.amazon.com/lambda/latest/dg/with-userapp-walkthrough-custom-events-upload.html).
-Remember to use the correct `--profile user` that you setup during the AWS CLI setup. 
-If are using the `default` user, you can remove `--profile adminuser` from the command.
-
-```
+echo -- 2. Delete Function $LAMBDAFN --
 aws lambda delete-function \
 --region us-east-1 \
---function-name DownloadSFReport \
---profile adminuser 
+--function-name $LAMBDAFN \
+--profile $AWSPROFILE
 
+echo -- 3. Create AWS Lambda function $LAMBDAFN with function.zip --
 aws lambda create-function \
 --region us-east-1 \
---function-name DownloadSFReport \
+--function-name $LAMBDAFN \
 --zip-file fileb://./function.zip \
---role {role-arn} \
+--role $ARN \
 --handler index.handler \
 --runtime nodejs4.3 \
---profile adminuser \
+--profile $AWSPROFILE \
 --timeout 300 \
---memory-size 1024
+--memory-size 512
 ```
++ Edit the script to correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
++ `LAMBDAFN` - Choose a valid name for your Lambda function. 
++ `ARN` - Get the ARN for the Lambda role "lambda_basic_execution" or "lambda_basic_execution_with_vpc".
+[IAM Home](https://console.aws.amazon.com/iam/home). View the details of the role and copy down its ARN. 
+It would look similar to `arn:aws:iam::854421518417:role/lambda_basic_execution`. 
++ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
++ `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
+
++ 1 - This will create a ZIP file for your lambda function and exclude the test.js file which has your credentials.
++ 2 - Deletes the old version if it exists.
++ 3 - Create a lambda function running under the role selected above with 300 seconds timeout, 
+NodeJS 4.3 runtime, 512 MB memory with function.zip for source code.
++ 4 - Invoke the lambda function passing it the event json that you created earlier.
+
+[Amazon docs on creating a Lambda function](http://docs.aws.amazon.com/lambda/latest/dg/with-userapp-walkthrough-custom-events-upload.html).
+
 
 #### Invoke the Lambda function
-+ Copy the event JSON from your test.js and save it into event.json.
-+ Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
-+ Invoke the function. Remember to use the correct function name if it is not `DownloadSFReport`.
-Use the correct `--profile user` that you setup during the AWS CLI setup. 
-If are using the `default` user, you can remove `--profile adminuser` from the command.
 
-```
++ Copy the following into the `invokelambda.sh` script in the `myfunction` directory. Alternatively download and edit this script [invokelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/invokelambda.sh).
+
+```sh
+#!/bin/sh
+LAMBDAFN=DownloadSFReport
+EVENTFILE=./event.json
+AWSPROFILE=adminuser
+
+echo -- 4. Invoke $LAMBDAFN with event.json --
 aws lambda invoke \
 --invocation-type RequestResponse \
---function-name DownloadSFReport \
+--function-name $LAMBDAFN \
 --region us-east-1 \
 --log-type Tail \
---payload file://./event.json \
---profile adminuser \
+--payload file://$EVENTFILE \
+--profile $AWSPROFILE \
 outputfile.txt
 ```
++ Edit the script to correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
++ `LAMBDAFN` - Choose a valid name for your Lambda function. 
++ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
++ `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
 
-The preceding invoke command specifies `RequestResponse` as the invocation type, which returns a response immediately in response to the function execution. 
-Alternatively, you can specify `Event` as the invocation type to invoke the function asynchronously.
-By specifying the `--log-type` parameter, the command also requests the tail end of the log produced by the function. 
-The log data in the response is `base64-encoded` as shown in the following example response:
++ Run the script to invoke the function.
+
 ```
+$ sh ./invokelambda.sh
+
+```
+-- 4. Invoke DownloadSFReport with event.json --
 {
-     "LogResult": "base64-encoded-log",
-     "StatusCode": 200 
+    "LogResult": "base64-encoded-log-data", 
+    "StatusCode": 200
 }
-```  
-On Linux and Mac, you can use the base64 command to decode the log.
 ```
-$ echo base64-encoded-log | base64 --decode
+
+The logresult data in the response is `base64-encoded`. On Linux and Mac, you can use the base64 command to decode the log. 
+```
+$ echo base64-encoded-log-data | base64 --decode
 ```
 The following is a decoded version of an example log.
 ```
 START RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a Version: $LATEST
-2016-04-18T04:15:10.683Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Starting here....
 2016-04-18T04:15:10.683Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Report:00OE0000002whwz
 2016-04-18T04:15:10.684Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Output to:LambdaReportOut_00OE0000002whwz_20160413-20160415_20160418040466.csv
 ...
@@ -471,7 +494,7 @@ END RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a
 REPORT RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Duration: 3218.25 ms	Billed Duration: 3300 ms 	Memory Size: 1024 MB	Max Memory Used: 79 MB
 ```
 
-### AWS errors and workarounds
+### AWS errors and the workarounds
 
 + `[PermanentRedirect: The bucket you are attempting to access must be addressed using the specified endpoint.` 
 You must specify a region to access your S3 bucket. Add this to your event.config or config.
@@ -486,7 +509,7 @@ Lambda has a max timeout of 5 minutes and will terminate the function after that
 Check the max memory used for your stuck function, and increase it if you are at the limit.
 
 
-## How it works
+## Library inner working
 The library does the following
 + Download the report metadata to setup the headers for the CSV file. I use the excellent node library csv-stringify to create CSV files.
 + Add a date filter to the report metadata.
