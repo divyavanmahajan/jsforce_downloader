@@ -228,7 +228,7 @@ npm install aws-sdk jsforce_downloader
 #### Create your lambda NodeJS script.
 
 Save this as index.js in the `myfunction` directory.
-Alternatively download [index.js](https://github.com/divyavanmahajan/jsforce_downloader/blob/master/lambda/index.js).
+Alternatively download [index.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/index.js).
 
 ```javascript
 // AWS Lambda wrapper around JSFORCE_Downloader
@@ -261,7 +261,7 @@ exports.handler = (event, context, callback) => {
 #### Source for your local test script.
 
 + Save the following code as test.js in the `myfunction` directory. 
-Alternatively download [test.js](https://github.com/divyavanmahajan/jsforce_downloader/blob/master/lambda/test.js).
+Alternatively download [test.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/test.js).
 + Edit the event to put in your Salesforce and AWS details. `SF_USER`, `SF_PASSWD_WITH_TOKEN`, `S3BUCKET`, `S3KEYPREFIX`.
 + Edit the event to set the `options.report`, `options.datefield`, `options.indexfield`, `options.startdate`, `options.enddate`.
 
@@ -335,7 +335,7 @@ If you want to use the Web console, you don't need the AWS CLI. [Instructions fo
 + Amazon has documented the process in their document ["Creating a Deployment Package (Node.js)".](http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html)
 
 + From the `myfunction` directory, run the following on the command line.
-Alternatively download [function.zip](https://github.com/divyavanmahajan/jsforce_downloader/blob/master/lambda/function.zip).
+Alternatively download [function.zip](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/function.zip).
 
 ```
 zip -rq function index.js node_modules README.md
