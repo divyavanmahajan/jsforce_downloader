@@ -204,16 +204,18 @@ var config = {
 }
 ```
 
-## Using it in AWS Lambda: TODO
+## Using it in AWS Lambda
 To run the downloader in AWS Lambda, you need to create a lambda zip package. 
 If you have compiled node libraries, prepare this on a Linux machine.
 
-+ Create an empty directory.
-+ Install aws-sdk and jsforce_downloader
-+ Create your lambda NodeJS script called index.js
-+ Test your function locally
-+ Create ZIP file and your AWS Lambda function.
-+ Test your Lambda function.
++ Prepare your environment.
+    + Create an empty directory.
+    + Install aws-sdk and jsforce_downloader.
++ Create your lambda NodeJS script.
++ Test your lambda function locally.
++ Packaging the lambda function (creating a zip file for your AWS Lambda function).
++ Create the Lambda function with the AWS CLI.
++ Invoke the Lambda function with the AWS CLI.
 
 #### Prepare your environment
 
@@ -223,9 +225,10 @@ cd myfunction
 npm install aws-sdk jsforce_downloader
 ```
 
-#### Source for your lambda NodeJS script
+#### Create your lambda NodeJS script.
 
 Save this as index.js in the `myfunction` directory.
+Alternatively download [index.js](https://github.com/divyavanmahajan/jsforce_downloader/blob/master/lambda/index.js).
 
 ```javascript
 // AWS Lambda wrapper around JSFORCE_Downloader
@@ -258,8 +261,9 @@ exports.handler = (event, context, callback) => {
 #### Source for your local test script.
 
 + Save the following code as test.js in the `myfunction` directory. 
+Alternatively download [test.js](https://github.com/divyavanmahajan/jsforce_downloader/blob/master/lambda/test.js).
 + Edit the event to put in your Salesforce and AWS details. `SF_USER`, `SF_PASSWD_WITH_TOKEN`, `S3BUCKET`, `S3KEYPREFIX`.
-+ Ensure the environment variables `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` are set to your AWS credentials.
++ Edit the event to set the `options.report`, `options.datefield`, `options.indexfield`, `options.startdate`, `options.enddate`.
 
 ```javascript
 var index = require('./index.js');
@@ -297,6 +301,7 @@ index.handler(event);
 ```
 
 #### Test your lambda function locally.
++ Ensure the environment variables `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` are set to your AWS credentials.
 + Run `node test.js` to test the lambda function locally.
 + Verify the file was successfully uploaded into S3.
 
@@ -324,38 +329,87 @@ Async reports:3 - (succeeded:3,failed:0).
 Successfully uploaded data to monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160417220418.csv
 ```
 
-### Create and test the AWS Lambda function
+#### Packaging the lambda function
 + Setup your AWS CLI if you want to use the command line to create your lambda function. 
 If you want to use the Web console, you don't need the AWS CLI. [Instructions for CLI setup](http://docs.aws.amazon.com/lambda/latest/dg/setup-awscli.html).
-
-#### Packaging the lambda function
 + Amazon has documented the process in their document ["Creating a Deployment Package (Node.js)".](http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html)
+
 + From the `myfunction` directory, run the following on the command line.
+Alternatively download [function.zip](https://github.com/divyavanmahajan/jsforce_downloader/blob/master/lambda/function.zip).
+
 ```
 zip -rq function index.js node_modules README.md
 ```
 + This will create a ZIP file for your lambda function and exclude the test.js file which has your credentials.
 
 #### Create the Lambda function
-+ You can use the Web console instead of the following steps. In the Web console, 
++ Note: You can use the Web console instead of the following steps. 
 
-+ Create a lambda function with 300 seconds timeout, upload the function.zip file, run it 
++ Get the ARN for the Lambda role "lambda_basic_execution" or "lambda_basic_execution_with_vpc".
+[IAM Home](https://console.aws.amazon.com/iam/home). View the details of the role and copy down its ARN. 
+It would look similar to `arn:aws:iam::854421518417:role/lambda_basic_execution`.
+
++ Create a lambda function with 300 seconds timeout, upload the function.zip file.
+[Amazon docs on creating a Lambda function](http://docs.aws.amazon.com/lambda/latest/dg/with-userapp-walkthrough-custom-events-upload.html).
+Remember to use the correct `--profile user` that you setup during the AWS CLI setup. 
+If are using the `default` user, you can remove `--profile adminuser` from the command.
+
 ```
 aws lambda create-function \
 --region us-east-1 \
 --function-name DownloadSFReport \
 --zip-file fileb://./function.zip \
---role role-arn \
+--role {role-arn} \
 --handler index.handler \
---runtime runtime \
+--runtime nodejs4.3 \
 --profile adminuser \
 --timeout 300 \
 --memory-size 1024
 ```
 
-#### Test the Lambda function
-+ Copy the event from your test.js and use it to create the Test event for your Lambda function.
-+ Test the function.
+#### Invoke the Lambda function
++ Copy the event JSON from your test.js and save it into event.json.
++ Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
++ Invoke the function. Remember to use the correct function name if it is not `DownloadSFReport`.
+Use the correct `--profile user` that you setup during the AWS CLI setup. 
+If are using the `default` user, you can remove `--profile adminuser` from the command.
+
+```
+aws lambda invoke \
+--invocation-type RequestResponse \
+--function-name DownloadSFReport \
+--region us-east-1 \
+--log-type Tail \
+--payload file://./event.json \
+--profile adminuser \
+outputfile.txt
+```
+
+The preceding invoke command specifies `RequestResponse` as the invocation type, which returns a response immediately in response to the function execution. 
+Alternatively, you can specify `Event` as the invocation type to invoke the function asynchronously.
+By specifying the `--log-type` parameter, the command also requests the tail end of the log produced by the function. 
+The log data in the response is `base64-encoded` as shown in the following example response:
+```
+{
+     "LogResult": "base64-encoded-log",
+     "StatusCode": 200 
+}
+```  
+On Linux and Mac, you can use the base64 command to decode the log.
+```
+$ echo base64-encoded-log | base64 --decode
+```
+The following is a decoded version of an example log.
+```
+START RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a Version: $LATEST
+2016-04-18T04:15:10.683Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Starting here....
+2016-04-18T04:15:10.683Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Report:00OE0000002whwz
+2016-04-18T04:15:10.684Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Output to:LambdaReportOut_00OE0000002whwz_20160413-20160415_20160418040466.csv
+...
+2016-04-18T04:15:13.718Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Successfully uploaded data to s3://monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160418040466.csv
+END RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a
+REPORT RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Duration: 3218.25 ms	Billed Duration: 3300 ms 	Memory Size: 1024 MB	Max Memory Used: 79 MB
+```
 
 ### AWS errors and workarounds
 
