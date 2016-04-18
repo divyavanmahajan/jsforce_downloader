@@ -269,61 +269,29 @@ If you have compiled node libraries, prepare this on a Linux machine.
 + Create the Lambda function with the AWS CLI.
 + Invoke the Lambda function with the AWS CLI.
 
-#### Prepare your environment
+#### Create your lambda NodeJS script.
 
 ```
 mkdir myfunction
 cd myfunction
 npm install aws-sdk jsforce_downloader
+curl -O https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/index.js
+curl -O https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/test.js
+curl -O https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/event.json
+curl -O https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/makelambda.sh
+curl -O https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/invokelambda.sh
+
 ```
 
-#### Create your lambda NodeJS script.
-
-+ Create the file index.js in the `myfunction` directory with this content.
-Alternatively download [index.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/index.js).
-
-```javascript
-// AWS Lambda wrapper around JSFORCE_Downloader
-'use strict';
-var jsforce_downloader = require('jsforce_downloader');
-/**
- * Event JSON should be
- * event.config = JSForce_Downloader config options that override the defaults.
- * event.options = JSForce_Downloader parameters to download the report.
- */
-exports.handler = (event, context, callback) => {
-        var config =  {
-                WRITE_TEMP_FILES: false,
-                REPORTPREFIX: "LambdaReportOut_",
-                OUTPUTTO: "s3"
-        };
-
-        if (event.config) {
-                for (var key in event.config)
-                        config[key]=event.config[key];
-        }
-        var options = event.options; 
-        if (options) {
-                jsforce_downloader.initialize(config);
-                jsforce_downloader.downloadreport(options.report, options.datefield,options.indexfield, options.startdate,options.enddate);
-        }       
-};
-```
-
-+ Create the file test.js in the `myfunction` directory with this content.
-Alternatively download [test.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/test.js).
-
-```javascript
-var index = require('./index.js');
-var event = require('./event.json');
-index.handler(event);
-```
++ View [index.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/index.js) .
++ View [test.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/test.js).
 
 #### Create the event for your lambda function.
 
-+ Create the event file - as as event.json in the `myfunction` directory using the following content. 
-+ Edit the event to put in your Salesforce and AWS details. `SF_USER`, `SF_PASSWD_WITH_TOKEN`, `S3BUCKET`, `S3KEYPREFIX`.
-+ Edit the event to set the `options.report`, `options.datefield`, `options.indexfield`, `options.startdate`, `options.enddate`.
++ Edit the event file in the `myfunction` directory. 
++ Set your Salesforce and AWS details. `SF_USER`, `SF_PASSWD_WITH_TOKEN`, `S3BUCKET`, `S3KEYPREFIX`.
++ Set the compression option `GZIP` to `true` or `false`.
++ Set the report options. `report`, `datefield`, `indexfield`, `startdate`, `enddate`.
 
 Alternatively download and edit [event.json](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/event.json).
 
@@ -393,8 +361,16 @@ Successfully uploaded data to s3://monima/jsforce/LambdaReportOut_00OE0000002whw
 If you want to use the Web console, you don't need the AWS CLI. [Instructions for CLI setup](http://docs.aws.amazon.com/lambda/latest/dg/setup-awscli.html).
 + Amazon has documented the process in their document ["Creating a Deployment Package (Node.js)".](http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html)
 
-+ Copy the following into the `makelambda.sh` script in the `myfunction` directory. Alternatively download and edit this script [makelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/makelambda.sh).
++ Edit the `makelambda.sh` script in the `myfunction` directory. 
++ Edit the script to correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
++ `ARN` - Get the ARN for the Lambda role "lambda_basic_execution" or "lambda_basic_execution_with_vpc".
+[IAM Home](https://console.aws.amazon.com/iam/home). View the details of the role and copy down its ARN. 
+It would look similar to `arn:aws:iam::854421518417:role/lambda_basic_execution`. 
++ `LAMBDAFN` - Choose a valid name for your Lambda function. 
++ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
++ `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
 
+Script [makelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/makelambda.sh).
 ```
 #!/bin/sh
 ARN=arn:aws:iam::852391518417:role/lambda_basic_execution
@@ -424,27 +400,48 @@ aws lambda create-function \
 --timeout 300 \
 --memory-size 512
 ```
-+ Edit the script to correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
-+ `LAMBDAFN` - Choose a valid name for your Lambda function. 
-+ `ARN` - Get the ARN for the Lambda role "lambda_basic_execution" or "lambda_basic_execution_with_vpc".
-[IAM Home](https://console.aws.amazon.com/iam/home). View the details of the role and copy down its ARN. 
-It would look similar to `arn:aws:iam::854421518417:role/lambda_basic_execution`. 
-+ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
-+ `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
 
 + 1 - This will create a ZIP file for your lambda function and exclude the test.js file which has your credentials.
 + 2 - Deletes the old version if it exists.
 + 3 - Create a lambda function running under the role selected above with 300 seconds timeout, 
 NodeJS 4.3 runtime, 512 MB memory with function.zip for source code.
-+ 4 - Invoke the lambda function passing it the event json that you created earlier.
+
+Example:
+```
+$ sh ./makelambda.sh
+    -- 1. Make function.zip --
+    rm: function.zip: No such file or directory
+    -- 2. Delete Function DownloadSFReport --
+    -- 3. Create AWS Lambda function DownloadSFReport with function.zip --
+    {
+        "CodeSha256": "jQZ69IvYfpyX6w7KnMkyFCytdXba+rCLOeTd2P7Qg4c=", 
+        "FunctionName": "DownloadSFReport", 
+        "CodeSize": 4016351, 
+        "MemorySize": 512, 
+        "FunctionArn": "arn:aws:lambda:us-east-1:852391518417:function:DownloadSFReport", 
+        "Version": "$LATEST", 
+        "Role": "arn:aws:iam::852391518417:role/lambda_basic_execution", 
+        "Timeout": 300, 
+        "LastModified": "2016-04-18T21:48:36.966+0000", 
+        "Handler": "index.handler", 
+        "Runtime": "nodejs4.3", 
+        "Description": ""
+    }
+```
+
 
 [Amazon docs on creating a Lambda function](http://docs.aws.amazon.com/lambda/latest/dg/with-userapp-walkthrough-custom-events-upload.html).
 
 
 #### Invoke the Lambda function
 
-+ Copy the following into the `invokelambda.sh` script in the `myfunction` directory. Alternatively download and edit this script [invokelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/invokelambda.sh).
++ Edit the `invokelambda.sh` script in the `myfunction` directory. 
++ Correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
++ `LAMBDAFN` - Choose a valid name for your Lambda function. 
++ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
++ `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
 
+Script [invokelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/invokelambda.sh).
 ```sh
 #!/bin/sh
 LAMBDAFN=DownloadSFReport
@@ -461,12 +458,8 @@ aws lambda invoke \
 --profile $AWSPROFILE \
 outputfile.txt
 ```
-+ Edit the script to correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
-+ `LAMBDAFN` - Choose a valid name for your Lambda function. 
-+ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
-+ `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
 
-+ Run the script to invoke the function.
+Run the script to invoke the function.
 
 ```
 $ sh ./invokelambda.sh
@@ -482,16 +475,13 @@ $ sh ./invokelambda.sh
 The logresult data in the response is `base64-encoded`. On Linux and Mac, you can use the base64 command to decode the log. 
 ```
 $ echo base64-encoded-log-data | base64 --decode
-```
-The following is a decoded version of an example log.
-```
-START RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a Version: $LATEST
-2016-04-18T04:15:10.683Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Report:00OE0000002whwz
-2016-04-18T04:15:10.684Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Output to:LambdaReportOut_00OE0000002whwz_20160413-20160415_20160418040466.csv
-...
-2016-04-18T04:15:13.718Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Successfully uploaded data to s3://monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160418040466.csv
-END RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a
-REPORT RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Duration: 3218.25 ms	Billed Duration: 3300 ms 	Memory Size: 1024 MB	Max Memory Used: 79 MB
+    START RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a Version: $LATEST
+    2016-04-18T04:15:10.683Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Report:00OE0000002whwz
+    2016-04-18T04:15:10.684Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Output to:LambdaReportOut_00OE0000002whwz_20160413-20160415_20160418040466.csv
+    ...
+    2016-04-18T04:15:13.718Z	231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Successfully uploaded data to s3://monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160418040466.csv
+    END RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a
+    REPORT RequestId: 231b8ce2-051c-11e6-84c3-af7b2d0cd02a	Duration: 3218.25 ms	Billed Duration: 3300 ms 	Memory Size: 1024 MB	Max Memory Used: 79 MB
 ```
 
 ### AWS errors and the workarounds
