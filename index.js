@@ -30,52 +30,62 @@ var global_written_count = 0;
 
 var conn = new jsforce.Connection();
 var config = {
-    MAX_CONCURRENT: 30, 
+    MAX_CONCURRENT: 30,
     // 30 parallel async report requests
-    
-    WAIT_BETWEEN_REQUESTS: 1000, 
+
+    WAIT_BETWEEN_REQUESTS: 1000,
     // 1000 milliseconds
-    
-    REPORTSECTION: "T!T", 
+
+    REPORTSECTION: "T!T",
     // REPORTSECTION - The section of the report that you want to see. This is explained in the 
     // [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) 
     // - in the section decode the Fact Map. 
-    
-    WRITE_TEMP_FILES: !fs.existsSync('./tmp'), 
+
+    WRITE_TEMP_FILES: false,
     // Store output of each async report to the tmp subdirectory.
-    
+
     SFOptions: {
         loginUrl: "https://login.salesforce.com"
-    }, 
+    },
     // Initialization options for jsforce (see http://jsforce.github.io/jsforce/doc/Connection.html)
-    
+
     SF_USER: process.env.SF_USER,
     SF_PASSWD_WITH_TOKEN: process.env.SF_PASSWD_WITH_TOKEN,
-    
+
     REPORTPREFIX: "ReportOut_",
     // File name generated is REPORTPREFIX + reportid + startdate + enddate + execution timestamp
-    
-    OUTPUTTO: "file", 
+
+    OUTPUTTO: "file",
     // This can be 'file' - to write results to a file; or 's3' - to write results to a S3 object.
-    
+
+    GZIP: false,
+    // If set to true, this will use GZIP to compress the output file
+
     AWSCONFIG: {
         //accessKeyId: 'AKID', secretAccessKey: 'SECRET', 
         region: 'us-east-1'
-    }, 
+    },
     // This is required when you are using AWS S3 outside AWS Lambda and have not set the environment variables AWS_ACCESS_KEY and AWS_SECRET_KEY.  
     // See http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/Config.html#constructor-property
-        
-    S3BUCKET: "", 
+
+    S3BUCKET: "",
     // S3 bucket if OUTPUTTO is set to "s3".
-    
-    S3KEYPREFIX: "" 
+
+    S3KEYPREFIX: ""
     // S3 key prefix if OUTPUTTO is set to "s3". This is the path where you want to store the output file.
 };
 
 
 module.exports.config = config;
 var AWS;
+module.exports.s3outputkey = "";
+module.exports.result = ""; // CSV data set is exposed
+module.exports.reportName = ""; // Fetched from Metadata
+module.exports.reportDescribe = {}; // Result of Report.Describe
+
 module.exports.initialize = function(_config) {
+    config.WRITE_TEMP_FILES = fs.existsSync('./tmp');
+
     if (typeof (_config) != "undefined") {
         for (var key in _config)
             config[key] = _config[key];
@@ -108,13 +118,14 @@ module.exports.downloadCommand = function() {
         console.error('\tIf you have a tmp subdirectory, the raw json output from the report will be stored in that directory');
         return;
     } else {
+        config.OUTPUTTO = "file";
         if (typeof process.argv[7] === "number") {
             config.MAX_CONCURRENT = process.argv[7];
         }
         if (typeof process.argv[8] === "string") {
             config.REPORTSECTION = process.argv[8];
         }
-	module.exports.initialize();
+        module.exports.initialize();
         module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
     }
 }
@@ -140,19 +151,27 @@ module.exports.downloadCommandS3 = function() {
         config.S3KEYPREFIX = process.argv[8];
         if (typeof process.argv[9] === "string") {
             config.AWSCONFIG.region = process.argv[9];
-            console.log('Switching AWS region to '+config.AWSCONFIG.region);
+            console.log('Switching AWS region to ' + config.AWSCONFIG.region);
         }
-	module.exports.initialize();
+        module.exports.initialize();
         module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
     }
 }
 
 module.exports.downloadreport_file = function(_reportID, _startDate, _endDate) {
     var today = lastUpdate.format('YYYYMMDDHHMMSS');
-    return config.REPORTPREFIX + _reportID + '_' + StartDate.format("YYYYMMDD") + '-' + EndDate.format("YYYYMMDD") + '_' + today + '.csv';
+    var filename = config.REPORTPREFIX + _reportID + '_'
+        + StartDate.format("YYYYMMDD") + '-'
+        + EndDate.format("YYYYMMDD") + '_'
+        + today + '.csv';
+    if (config.GZIP) {
+        filename = filename + ".gz";
+    }
+    return filename;
 }
 /**
  * Download the report.
+ * Returns a promise
  *
  * @protected
  * @param {String} _reportID - Salesforce report identifier. You can get this from the URL when you are viewing the report.
@@ -183,8 +202,20 @@ module.exports.downloadreport = function(_reportID, _datefield, _indexfieldOffse
 
 
     OutputFile = module.exports.downloadreport_file(_reportID, _startDate, _endDate);
+    console.log("Starting here....");
+    console.log("Report:" + reportID);
+    if (config.OUTPUTTO == "s3") {
+        console.log("Upload to: s3://" + config.S3BUCKET + "/" + config.S3KEYPREFIX + "/" + OutputFile);
+    } else {
+        console.log("Output to file:" + OutputFile);
+    }
+    if (config.WRITE_TEMP_FILES) {
+        console.log("JSON outputs of each Async report stored in ./tmp");
+    }
+    console.log("Start:" + StartDate.format('YYYY-MM-DD'));
+    console.log("End:" + EndDate.format('YYYY-MM-DD'));
 
-    conn.login(config.SF_USER, config.SF_PASSWD_WITH_TOKEN).
+    return conn.login(config.SF_USER, config.SF_PASSWD_WITH_TOKEN).
         then(function() {
             return conn.identity();
         }, function(err) {
@@ -202,20 +233,16 @@ module.exports.downloadreport = function(_reportID, _datefield, _indexfieldOffse
             return getReportForDateRange(StartDate, EndDate, "days");
         }, writeOutErrorFn('login')).then(function() {
             console.log("=============================");
-            console.log("Report       :" + reportID);
-            console.log("Date range   :" + StartDate.format('YYYY-MM-DD') + " to " + EndDate.format('YYYY-MM-DD'));
-            console.log("Output to    :" + OutputFile);
-            console.log('Done         :' + global_written_count + " records written.");
-            console.log('Async reports:' + async_report_requests + ' - (succeeded:' + async_report_success + ',failed:' + (async_report_requests - async_report_success) + ').')
+            console.log("Report        :" + module.exports.reportName + " ("+reportID+")");
+            console.log("Date range    :" + StartDate.format('YYYY-MM-DD') + " to " + EndDate.format('YYYY-MM-DD'));
+            console.log("Output to     :" + OutputFile);
+            console.log('Record count  :' + global_written_count );
+            console.log('Async requests:' + async_report_requests + ' - (succeeded:' + async_report_success + ',failed:' + (async_report_requests - async_report_success) + ').');
+            return module.exports.result;
         }, writeOutErrorFn('jsforce_report.downloadreport'))
         .catch(function(err) {
             console.error(err);
         });
-    console.log("Starting here....");
-    console.log("Report:" + reportID);
-    console.log("Output to:" + OutputFile);
-    console.log("Start:" + StartDate.format('YYYY-MM-DD'));
-    console.log("End:" + EndDate.format('YYYY-MM-DD'));
 }
 
 
@@ -228,9 +255,6 @@ function writeOutErrorFn(message) {
         console.error(message + ":" + err);
     };
 }
-
-
-
 
 
 function getReportForDateRange(startdate, enddate, interval) {
@@ -274,17 +298,37 @@ function getReportForDateRange(startdate, enddate, interval) {
         });
         return Promise.all(concurrentPromises).then(function() {
             stringifier.end();
+            return onFinishWriteFile();
         }, writeOutErrorFn("PromiseAll error"));
     }, writeOutErrorFn("PrepareCSV error"));
     return promise;
 }
 
-function onFinishWriteFile(data) {
+function onFinishWriteFile() {
+    // Data is in the global module.exports.result
+    var data = module.exports.result;
+    if (config.GZIP) {
+        const zlib = require('zlib');
+        var gzdata = zlib.gzipSync(data);
+        data = gzdata;
+    }
+
     if (config.OUTPUTTO == "file") {
-        fs.writeFile(OutputFile, data);
+        return new Promise(function(fulfill, reject) {
+            fs.writeFile(OutputFile, data, function(err, res) {
+                if (err) {
+                    console.error(err);
+                    reject(err);
+                } else {
+                    console.log("Successfully written data to " + OutputFile);
+                    fulfill(data);
+                }
+            });
+        });
+
     }
     if (config.OUTPUTTO == "s3") {
-        s3WriteFile(OutputFile, data);
+        return s3WriteFile(OutputFile, data);
     }
 }
 
@@ -293,18 +337,26 @@ function s3WriteFile(filename, data) {
         console.error("s3WriteFile:aws-sdk not loaded correctly");
     }
     var key = config.S3KEYPREFIX + "/" + filename;
-    s3putobject(config.S3BUCKET, key, data);
+
+    return s3putobject(config.S3BUCKET, key, data);
 }
 
 function s3putobject(bucket, key, data) {
     var s3 = new AWS.S3();
     var params = { Bucket: bucket, Key: key, Body: data };
-
-    s3.putObject(params, function(err, data) {
-        if (err)
-            console.log(err)
-        else
-            console.log("Successfully uploaded data to s3://" + bucket + "/" + key);
+    return new Promise(function(fulfill, reject) {
+        s3.putObject(params, function(err, data) {
+            if (err) {
+                console.error(err);
+                reject(err);
+            }
+            else {
+                console.log("Successfully uploaded data to s3://" + bucket + "/" + key);
+                module.exports.s3outputkey = "s3://" + bucket + "/" + key;
+                OutputFile = module.exports.s3outputkey;
+                fulfill(data);
+            }
+        });
     });
 }
 
@@ -324,13 +376,18 @@ function prepareCSV(reportID) {
         console.log(err.message);
     });
     stringifier.on('finish', function() {
-        onFinishWriteFile(data);
+        // onFinishWriteFile(data);
+        module.exports.result = data;
+        // TODO _ Compression??
     });
 
     //stringifier.pipe(fs.createWriteStream('data/outputDateRange.csv'));
     var report = conn.analytics.report(reportID);
     return report.describe().then(function(result) {
         var columns = ["lastUpdated"];
+        module.exports.reportDescribe = result;
+        module.exports.reportName = result.reportMetadata.name;
+        console.log("Report name: "+module.exports.reportName);
         result.reportMetadata.detailColumns.map(function(cname) {
             cname = cname.replace(/\./g, '_');
             columns.push(cname + "_label");
@@ -381,12 +438,24 @@ function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
                 if (typeof rSection === "undefined" || rSection.rows.length == 0) {
                     message = "No data in section " + config.REPORTSECTION;
                     if (config.WRITE_TEMP_FILES) {
-                        fs.writeFile('tmp/empty-' + n + '.json', JSON.stringify(results));
+                        var tempfile = getTempFilename(n,true); // Empty file
+                        console.log("  Writing out :"+tempfile);
+                        try {
+                            fs.writeFileSync(tempfile, JSON.stringify(results));
+                        } catch (ferr) {
+                            console.error('Temp file error:' + tempfile + ":" + ferr);
+                        }
                     }
                 } else {
                     message = rSection.rows.length + " rows in section " + config.REPORTSECTION;
                     if (config.WRITE_TEMP_FILES) {
-                        fs.writeFile('tmp/output-' + n + '.json', JSON.stringify(results));
+                        var tempfile = getTempFilename(n,false);
+                        console.log("  Writing out :"+tempfile);
+                        try {
+                            fs.writeFileSync(tempfile, JSON.stringify(results));
+                        } catch (ferr) {
+                            console.error('Temp file error:' + tempfile + ":" + ferr);
+                        }
                     }
                 }
                 console.log(t + ":Returned Range: (" + st.format('YYYY-MM-DD') + " to " + end.format('YYYY-MM-DD') + ") :" + results.attributes.status + ":" + message);
@@ -398,7 +467,7 @@ function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
                 }
                 writeResult(stringifier, results);
                 n = n + 1;
-                console.log(rSection.aggregates[0].value + " records");
+                // console.log(rSection.aggregates[0].value + " records");
 
                 var firstrow = rSection.rows[0].dataCells[indexfieldOffset];
                 var lastrow = rSection.rows.pop().dataCells[indexfieldOffset];
@@ -419,6 +488,19 @@ function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
     };
 }
 
+function getTempFilename(n,empty) {
+    var tempfile = "tmp/" + OutputFile;
+    if (config.GZIP) {
+        tempfile = tempfile.slice(0, -3); // remove .gz
+    }
+    tempfile = tempfile.slice(0, -4); // remove .csv
+    tempfile = tempfile +'-'+ n;
+    if (empty) {
+        tempfile = tempfile + ".empty";
+    }
+    tempfile = tempfile + ".json";
+    return tempfile;
+}
 
 function waitForInstance(reportinstance) {
     var waitpromise = Promise.resolve();
@@ -505,7 +587,7 @@ module.exports.showMetadata = function(_reportID) {
             console.error('SF_PASSWD_WITH_TOKEN=password and security token');
         }).then(function(res) {
             console.log('Logged into Salesforce');
-            console.log("username: " + res.username + "(" + res.display_name + ")");
+            //console.log("username: " + res.username + "(" + res.display_name + ")");
         }).then(function() {
             var report = conn.analytics.report(reportID);
             return report.describe();
@@ -532,10 +614,18 @@ module.exports.showMetadata = function(_reportID) {
 }
 
 function generateMySQLTable(reportID, columns, info) {
-    console.log("SQL Syntax for MySQL");
-    console.log("CREATE TABLE R" + reportID + ' (');
-    console.log("  lastUpdate datetime DEFAULT NULL,");
-
+    var i = 0;
+    var sql_insert;
+    var sql_insert_columns;
+    var sql_insert_values;
+    var sql_create;
+    var sql_table = 'T' + reportID;
+    sql_create = "CREATE TABLE " + sql_table + ' (';
+    sql_create = sql_create + "\n  lastUpdate datetime DEFAULT NULL,";
+    sql_insert = "set @@sql_mode='no_engine_substitution';";
+    sql_insert = sql_insert + "\nINSERT INTO " + sql_table;
+    sql_insert_columns = " (lastUpdate,";
+    sql_insert_values = " VALUES (?,";
     columns.map(function(cname) {
         var col = info[cname];
         var sqltype = "varchar(250)";
@@ -561,10 +651,82 @@ function generateMySQLTable(reportID, columns, info) {
         if (col.dataType == 'base64') sqltype = "varchar(4000)";
         if (col.dataType == 'string') sqltype = "varchar(4000)";
         cname = cname.replace(/\./g, '_');
-        console.log("  " + cname + "_label varchar(255) DEFAULT NULL,");
-        console.log("  " + cname + "_value " + sqltype + " DEFAULT NULL,");
+
+        sql_create = sql_create + "\n  " + cname + "_label varchar(255) DEFAULT NULL,";
+        if (i > 0) {
+            sql_create = sql_create + "\n  " + cname + "_value " + sqltype + " DEFAULT NULL,";
+        } else {
+            // Setup a field as primary key so Redshift can use OVERWRITE_INSERT mode.
+            i = i + 1;
+            sql_create = sql_create + "\n  " + cname + "_value " + sqltype + " PRIMARY KEY,";
+        }
+        sql_insert_columns = sql_insert_columns + cname + "_label,";
+        sql_insert_columns = sql_insert_columns + cname + "_value,";
+        sql_insert_values = sql_insert_values + "?,?,";
     });
-    console.log(") DEFAULT CHARSET=utf8");
+    sql_create = sql_create.slice(0, -1) + "\n);\n";
+    sql_insert_columns = sql_insert_columns.slice(0, -1) + ") ";
+    sql_insert_values = sql_insert_values.slice(0, -1) + ") ";
+    sql_insert = sql_insert + sql_insert_columns + sql_insert_values + ";\n";
+    var sql_mysql_load = "set @@sql_mode='no_engine_substitution';"
+        + "\nLOAD DATA LOCAL INFILE 'ReportOut_" + reportID + "_startdate-enddate_timestamp.csv'"
+        + "\n INTO TABLE " + sql_table
+        + "\n FIELDS TERMINATED BY ','"
+        + "\n ENCLOSED BY '" + '"' + "'"
+        + "\n LINES TERMINATED BY '\\n'"
+        + "\n IGNORE 1 ROWS;"
+
+    var sql_rs_load = "COPY " + sql_table
+        + " FROM 's3://s3bucket/s3path/ReportOut_" + reportID + "_startdate-enddate_timestamp.csv'"
+        + " credentials 'aws_access_key_id={your access key};aws_secret_access_key={your secret key}'"
+        + " DELIMITER ',' DATEFORMAT 'auto' TIMEFORMAT 'auto' "
+        + " IGNOREHEADER 1 EMPTYASNULL BLANKSASNULL REMOVEQUOTES IGNOREBLANKLINES"
+        + " TRUNCATECOLUMNS  TRIMBLANKS REGION 'us-east-1';"
+        + "\n select top 20 * from stl_load_errors order by starttime desc;"
+        + "\n select count(*) from " + sql_table + ";";
+    var sql_rs_load_gz = "COPY " + sql_table
+        + " FROM 's3://s3bucket/s3path/ReportOut_" + reportID + "_startdate-enddate_timestamp.csv.gz'"
+        + " credentials 'aws_access_key_id={your access key};aws_secret_access_key={your secret key}'"
+        + " GZIP DELIMITER ',' DATEFORMAT 'auto' TIMEFORMAT 'auto' "
+        + " IGNOREHEADER 1 EMPTYASNULL BLANKSASNULL REMOVEQUOTES IGNOREBLANKLINES"
+        + " TRUNCATECOLUMNS  TRIMBLANKS REGION 'us-east-1';"
+        + "\n select top 20 * from stl_load_errors order by starttime desc;"
+        + "\n select count(*) from " + sql_table + ";";
+
+    var filename = 'ReportSQL_' + reportID + '.sql'
+    fs.open(filename, "w", function(err, fd) {
+        if (err) {
+            console.error(err);
+        } else {
+            fs.writeSync(fd, "-- MYSQL/Redshift create statement for " + reportID);
+            fs.writeSync(fd, "\n-- Please adjust the PRIMARY KEY as needed. Redshift needs a Primary key");
+            fs.writeSync(fd, "\n--\n");
+            fs.writeSync(fd, sql_create);
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- MYSQL insert statement for " + reportID);
+            fs.writeSync(fd, "\n--\n");
+            fs.writeSync(fd, sql_insert);
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- MYSQL LOAD statement for " + reportID);
+            fs.writeSync(fd, "\n--\n");
+            fs.writeSync(fd, sql_mysql_load);
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- Redshift COPY command to load from S3 :" + reportID);
+            fs.writeSync(fd, "\n--\n");
+            fs.writeSync(fd, sql_rs_load);
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- ");
+            fs.writeSync(fd, "\n-- Redshift COPY command to load from S3 with compression/gzip:" + reportID);
+            fs.writeSync(fd, "\n--\n");
+            fs.writeSync(fd, sql_rs_load_gz);
+            fs.closeSync(fd);
+            console.log("SQL Syntax for MySQL and Redshift is written to :" + filename);
+        }
+    });
+
 }
 /**
  * Download the report metadata. Command line wrapper

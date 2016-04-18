@@ -1,6 +1,6 @@
 # jsforce_downloader
 
-Extract report data from Salesforce into a comma separated file. This package includes 4 components that can be used independantly.
+Extract report data from Salesforce into a comma separated file. This package includes 4 components that can be used independently.
 - nodejs library to download Salesforce reports that have a date filter.
 - jsforce_downloader - command line utility to download Salesforce reports. (command line wrapper of the downloader).
 - jsforce_s3_downloader - command line utility to download Salesforce reports directly to S3.
@@ -16,10 +16,7 @@ Extract report data from Salesforce into a comma separated file. This package in
 - Support for AWS Lambda. Run this downloader in AWS Lambda. A Lambda event handler is provided.
 - Support for AWS S3. Upload the downloaded data directly to S3 (no temp files needed on local machine).
 
-
-## Requirements
-- The underlying object must have a date field that can be used as a standard date filter.
-- Typically this can be the object's CreatedDate.
+Report your issues or ask for feature requests at [Github Issues](https://github.com/divyavanmahajan/jsforce_downloader/issues).
 
 ## How to install
 Install jsforce_downloader and jsforce_downloader_metadata.
@@ -55,16 +52,28 @@ If you are saving the output to S3 (OUTPUTTO="s3"), you should set the following
 
 ## Command line tools: How to run jsforce_downloader_metadata
 
-This will display all the columns and filters of a report. The metadata is saved as a JSON file. It will 
+This will display all the metadata of a report. It includes details of columns and filters etc. 
+Ensure you have set the environment variables for Salesforce `SF_USER="myuser@xyz.com"` and `SF_PASSWD_WITH_TOKEN="password";`.
 
-    jsforce_downloader_metadata {reportid}
+Command: `jsforce_downloader_metadata {reportid}`
+
     jsforce_downloader_metadata 00OE0000002wlroMAA
 
-This creates the file *ReportOutput_00OE0000002wlroMAA.json*.
-This file has the metadata for the report - so you can easily find the index of the column to display, {Report Section of the Fact Map} and report filters.
+This creates the file `ReportMeta_00OE0000002wlroMAA.json`. The file has the JSON format metadata for the report - so you can easily find the index of the column to display, 
+{Report Section of the Fact Map} and report filters. 
+The tool also creates a helper sql file `ReportSQL_00OE0000002wlroMAA.sql`. It contains the SQL commands for MySQL / Redshift to:
++Create a table for this dataset
++MYSQL insert SQL statement
++MYSQL to load entire CSV into the table through SQL Workbench.
++Redshift to copy S3 file into a table.
++Redshift to copy S3 file into a table if you have compressed with GZIP.
+
 
 
 ## Command line tools: How to run jsforce_downloader
+Command line: To download a report
+`jsforce_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD} [{MAX_Concurrent} [{Report section of the Fact Map}]]`
+
 
 Preparation to download a report, you need
 + The report ID (get this from the Salesforce URL when you open the report).    
@@ -80,17 +89,12 @@ Preparation to download a report, you need
    
    Each item in a row or column grouping is numbered starting with 0. Here are some examples of fact map keys:
    
-     0!T The first item in the first-level grouping.
-     1!T The second item in the first-level grouping.
-     0_0!T The first item in the first-level grouping and the first item in the second-level grouping. 
-     0_1!T The first item in the first-level grouping and the second item in the second-level grouping. 
-
-      
-To download a report, you need
-      jsforce_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD} [{MAX_Concurrent} [{Report section of the Fact Map}]]
+     0!T   | The first item in the first-level grouping.
+     1!T   | The second item in the first-level grouping.
+     0_0!T | The first item in the first-level grouping and the first item in the second-level grouping. 
+     0_1!T | The first item in the first-level grouping and the second item in the second-level grouping. 
 
 Example:
-
 ```
       $ jsforce_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-05 4 'T!T'
 
@@ -190,6 +194,10 @@ var config = {
     OUTPUTTO: "file", 
     // This can be 'file' - to write results to a file; or 's3' - to write results to a S3 object.
     
+
+    GZIP: false,
+    // If set to true, this will use GZIP to compress the output file
+
     AWSCONFIG: {    
         accessKeyId: 'AKID', secretAccessKey: 'SECRET', region: 'us-west-2'
     }, 
@@ -203,6 +211,48 @@ var config = {
     // S3 key prefix if OUTPUTTO is set to "s3". This is the path where you want to store the output file.
 }
 ```
+#### Using the library
+
+`jsforce_downloader.downloadreport` : is the key function. It will download the report. The function returns a promise.
+
+```javascript
+/**
+ * @param {String} _reportID - Salesforce report identifier. You can get this from the URL when you are viewing the report.
+ * @param {String} _datefield - Internal name of the date field used in the standard date filter. 
+ * @param {String} _indexfieldOffset - Column that should be displayed while running the report (starts at 0). By default the first column is shown.
+ * @param {Date} _startDate - Starting date in the format YYYY-MM-DD.
+ * @param {Date} _endDate - Ending date in the format YYYY-MM-DD.
+ * @param {String} _user - username.
+ * @param {String} _password - password with security token.
+ */
+ ```
+ 
+ Example:
+ 
+```javascript
+    jsforce_downloader.initialize(config);
+    jsforce_downloader.downloadreport(report, "Datefield", options.indexfield, options.startdate, options.enddate).then(
+        function(res) {
+            console.log(jsforce_downloader.s3outputkey);
+            if (typeof callback == "function") {
+                callback(null, jsforce_downloader.s3outputkey);
+            }
+        }, function(err) {
+            console.error(err);
+            if (typeof callback == "function") {
+                callback(err, null);
+            }
+
+        });
+```
+#### Other helpful exports
+
+`config`         | Config for the module.
+`s3outputkey`    | S3 URL if output is to S3.
+`result`         | CSV data set.
+`reportName`     | Name of the report from the metadata.
+`reportDescribe` | JSON metadata returned by report.describe()
+
 
 ## Using it in AWS Lambda
 To run the downloader in AWS Lambda, you need to create a lambda zip package. 
@@ -227,7 +277,7 @@ npm install aws-sdk jsforce_downloader
 
 #### Create your lambda NodeJS script.
 
-Save this as index.js in the `myfunction` directory.
++ Create the file index.js in the `myfunction` directory with this content.
 Alternatively download [index.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/index.js).
 
 ```javascript
@@ -258,17 +308,24 @@ exports.handler = (event, context, callback) => {
 };
 ```
 
-#### Source for your local test script.
-
-+ Save the following code as test.js in the `myfunction` directory. 
++ Create the file test.js in the `myfunction` directory with this content.
 Alternatively download [test.js](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/test.js).
-+ Edit the event to put in your Salesforce and AWS details. `SF_USER`, `SF_PASSWD_WITH_TOKEN`, `S3BUCKET`, `S3KEYPREFIX`.
-+ Edit the event to set the `options.report`, `options.datefield`, `options.indexfield`, `options.startdate`, `options.enddate`.
 
 ```javascript
 var index = require('./index.js');
-// Create the event that will be passed to the handler.
-var event =
+var event = require('./event.json');
+index.handler(event);
+```
+
+#### Create the event for your lambda function.
+
++ Create the event file - as as event.json in the `myfunction` directory using the following content. 
++ Edit the event to put in your Salesforce and AWS details. `SF_USER`, `SF_PASSWD_WITH_TOKEN`, `S3BUCKET`, `S3KEYPREFIX`.
++ Edit the event to set the `options.report`, `options.datefield`, `options.indexfield`, `options.startdate`, `options.enddate`.
+
+Alternatively download and edit [event.json](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/event.json).
+
+```javascript
 {
         "config":{
                 "MAX_CONCURRENT": 40,
@@ -279,25 +336,25 @@ var event =
                         "loginUrl": "https://login.salesforce.com"
                 },
                 "AWSCONFIG": {    
-                        "region": 'us-east-1'
+                        "region": "us-east-1"
                 },
                 "SF_USER" : "sfuser@sfuser.com",
                 "SF_PASSWD_WITH_TOKEN": "passwd_and_token",
                 "REPORTPREFIX": "LambdaReportOut_",
                 "OUTPUTTO": "s3",
+                "GZIP":false,
                 "S3BUCKET": "monima",
                 "S3KEYPREFIX":"jsforce"
 
         },
         "options":{
-                "report": "_salesforce_reportid_like_00OE0000002whwz",
+                "report": "_salesforce_reportid_like_00OE0000002qhwz",
                 "datefield": "Case.CreatedDate",
                 "indexfield": 0,
                 "startdate":"2016-04-13",
                 "enddate":"2016-04-15"
         }
-};
-index.handler(event);
+}
 ```
 
 #### Test your lambda function locally.
@@ -309,11 +366,11 @@ index.handler(event);
 $ node test.js
 Starting here....
 Report:00OE0000002whwz
-Output to:LambdaReportOut_00OE0000002whwz_20160413-20160413_20160417220418.csv
+Upload to:s3://monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160413_20160417220418.csv
 Start:2016-04-13
 End:2016-04-15
 Logged into Salesforce
-username: ei_heartbeat@philips.com(EI Heartbeat)
+username: myuser@sf.com (My user)
 0:Start Range: (2016-04-13 to 2016-04-13)
 1:Start Range: (2016-04-14 to 2016-04-14)
 2:Start Range: (2016-04-15 to 2016-04-15)
@@ -326,10 +383,10 @@ Date range   :2016-04-13 to 2016-04-15
 Output to    :LambdaReportOut_00OE0000002whwz_20160413-20160415_20160417220418.csv
 Done         :1232 records written.
 Async reports:3 - (succeeded:3,failed:0).
-Successfully uploaded data to monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160417220418.csv
+Successfully uploaded data to s3://monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160417220418.csv
 ```
 
-#### Packaging the lambda function
+#### Packaging and creating the lambda function
 + Setup your AWS CLI if you want to use the command line to create your lambda function. 
 If you want to use the Web console, you don't need the AWS CLI. [Instructions for CLI setup](http://docs.aws.amazon.com/lambda/latest/dg/setup-awscli.html).
 + Amazon has documented the process in their document ["Creating a Deployment Package (Node.js)".](http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html)
@@ -338,13 +395,11 @@ If you want to use the Web console, you don't need the AWS CLI. [Instructions fo
 Alternatively download [function.zip](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/function.zip).
 
 ```
-zip -rq function index.js node_modules README.md
+rm function.zip
+zip -rq function index.js node_modules -x node_modules/aws-sdk/*\* -x node_modules/jsforce/build/*\* -x node_modules/jsforce/test/*\*
+
 ```
 + This will create a ZIP file for your lambda function and exclude the test.js file which has your credentials.
-
-#### Create the Lambda function
-+ Note: You can use the Web console instead of the following steps. 
-
 + Get the ARN for the Lambda role "lambda_basic_execution" or "lambda_basic_execution_with_vpc".
 [IAM Home](https://console.aws.amazon.com/iam/home). View the details of the role and copy down its ARN. 
 It would look similar to `arn:aws:iam::854421518417:role/lambda_basic_execution`.
@@ -355,6 +410,11 @@ Remember to use the correct `--profile user` that you setup during the AWS CLI s
 If are using the `default` user, you can remove `--profile adminuser` from the command.
 
 ```
+aws lambda delete-function \
+--region us-east-1 \
+--function-name DownloadSFReport \
+--profile adminuser 
+
 aws lambda create-function \
 --region us-east-1 \
 --function-name DownloadSFReport \
