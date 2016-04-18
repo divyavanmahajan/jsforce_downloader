@@ -59,10 +59,12 @@ var config = {
     // This can be 'file' - to write results to a file; or 's3' - to write results to a S3 object.
     
     AWSCONFIG: {
-        accessKeyId: 'AKID', secretAccessKey: 'SECRET', region: 'us-west-2'
+        //accessKeyId: 'AKID', secretAccessKey: 'SECRET', 
+        region: 'us-east-1'
     }, 
     // This is required when you are using AWS S3 outside AWS Lambda and have not set the environment variables AWS_ACCESS_KEY and AWS_SECRET_KEY.  
-    
+    // See http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/Config.html#constructor-property
+        
     S3BUCKET: "", 
     // S3 bucket if OUTPUTTO is set to "s3".
     
@@ -102,7 +104,8 @@ module.exports.downloadCommand = function() {
         console.error('Usage: ' + process.argv[0] + ' ' + process.argv[1] + ' reportid datefield indexfieldOffset 2016-01-01 2016-01-05 [10, [T!T]]');
         console.error('\t10 - Number of concurrent requests.');
         console.error('\tT!T - The report section that should be downloaded.');
-        console.error('\n\tIf you create a tmp directory, the raw json output from the report will be stored in that directory');
+        console.error('\n\tPlease ensure you set the environment variable SF_USER, SF_PASSWD_WITH_TOKEN');
+        console.error('\tIf you have a tmp subdirectory, the raw json output from the report will be stored in that directory');
         return;
     } else {
         if (typeof process.argv[7] === "number") {
@@ -111,6 +114,35 @@ module.exports.downloadCommand = function() {
         if (typeof process.argv[8] === "string") {
             config.REPORTSECTION = process.argv[8];
         }
+	module.exports.initialize();
+        module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
+    }
+}
+
+/**
+ * Download the report to S3 bucket. Command line wrapper
+ * SF_USER - Environment variable with the user name.
+ * SF_PASSWD_WITH_TOKEN - Environment variable with the password and security token.
+ * AWS_ACCESS_KEY - Access Key ID
+ * AWS_SECRET_KEY - Secret for Access Key
+ * Command line:
+ * downloadreport reportid datefield indexfieldoffset startdate enddate s3bucket s3path
+ */
+module.exports.downloadCommandS3 = function() {
+    if (process.argv.length < 9) {
+        console.error('Usage: ' + process.argv[0] + ' ' + process.argv[1] + ' reportid datefield indexfieldOffset 2016-01-01 2016-01-05 s3bucket s3path [awsregion]');
+        console.error('\n\tPlease ensure you set the environment variable AWS_ACCESS_KEY, AWS_SECRET_KEY, SF_USER, SF_PASSWD_WITH_TOKEN');
+        console.error('\tIf you have a tmp subdirectory, the raw json output from the report will be stored in that directory');
+        return;
+    } else {
+        config.OUTPUTTO = "s3";
+        config.S3BUCKET = process.argv[7];
+        config.S3KEYPREFIX = process.argv[8];
+        if (typeof process.argv[9] === "string") {
+            config.AWSCONFIG.region = process.argv[9];
+            console.log('Switching AWS region to '+config.AWSCONFIG.region);
+        }
+	module.exports.initialize();
         module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
     }
 }
@@ -272,7 +304,7 @@ function s3putobject(bucket, key, data) {
         if (err)
             console.log(err)
         else
-            console.log("Successfully uploaded data to " + bucket + "/" + key);
+            console.log("Successfully uploaded data to s3://" + bucket + "/" + key);
     });
 }
 

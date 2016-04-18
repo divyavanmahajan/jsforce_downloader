@@ -1,6 +1,6 @@
 {
   "name": "jsforce_downloader",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Extract report data from Salesforce. Download more than 2000 rows, asynchronously. Report is downloaded by slicing it using a standard date filter field to use for a date range. For example - Case.CreatedDate to download Case reports by date of case creation. This supports Tabular, Summary and Matrix.",
   "main": "index.js",
   "scripts": {

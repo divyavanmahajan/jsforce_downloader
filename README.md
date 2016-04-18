@@ -3,6 +3,7 @@
 Extract report data from Salesforce into a comma separated file. This package includes 4 components that can be used independantly.
 - nodejs library to download Salesforce reports that have a date filter.
 - jsforce_downloader - command line utility to download Salesforce reports. (command line wrapper of the downloader).
+- jsforce_s3_downloader - command line utility to download Salesforce reports directly to S3.
 - jsforce_downloader_metadata - command line utility to display the metadata of a Salesforce report. Use this to inspect the fields and filters of a report. It also generates the SQL to create a table in MySQL to save this data.
 
 ## Features
@@ -90,12 +91,13 @@ To download a report, you need
 
 Example:
 
+```
       $ jsforce_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-05 4 'T!T'
 
       Labor__c.CreatedDate 5 2016-01-01 2016-01-05
       Starting here....
       Report:00OE0000002wlroMAA
-      Output to:ReportOutput_2016-01-01_to_2016-01-05.csv
+      Output to:ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312
       Start:2016-01-01
       End:2016-05-01
       Logged into Salesforce
@@ -110,21 +112,7 @@ Example:
       First: L-5156083 a0iE000000MiTNLIA3
       Last : L-5156837 a0iE000000MiUMMIA3
       Package size:83
-      2:Returned Range: 2016-01-03T00:00:00-08:00 - 2016-01-03T23:59:59-08:00:Success
-      158 records
-      First: L-5156873 a0iE000000MiUWyIAN
-      Last : L-5158480 a0iE000000MiWMsIAN
-      Package size:157
-      0:Returned Range: 2016-01-01T00:00:00-08:00 - 2016-01-01T23:59:59-08:00:Success
-      142 records
-      First: L-5155835 a0iE000000MiSVAIA3
-      Last : L-5156078 a0iE000000MiTF1IAN
-      Package size:141
-      3:Returned Range: 2016-01-04T00:00:00-08:00 - 2016-01-04T23:59:59-08:00:Success
-      706 records
-      First: L-5158662 a0iE000000MiWcxIAF
-      Last : L-5172382 a0iE000000MihGAIAZ
-      Package size:705
+      ....
       4:Returned Range: 2016-01-05T00:00:00-08:00 - 2016-01-05T23:59:59-08:00:Success
       665 records
       First: L-5172547 a0iE000000MihJHIAZ
@@ -133,17 +121,44 @@ Example:
       =============================
       Report:00OE0000002wlroMAA
       Date range:2016-01-01 to 2016-01-05
-      Output to:ReportOutput_2016-01-01_to_2016-01-05.csv
+      Output to:ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312
       Done:1755 records written.
       Async reports requested:5 - (succeeded:5,failed:0).
+```
+
+This creates the file *ReportOutput_00OE0000002wlroMAA_20160101_to_20160105_20160413134312.csv*.
+
+## Command line tools: How to run jsforce_s3_downloader
+To download a report, you need
+      jsforce_s3_downloader {reportid} {datefield} {index of field to display} {start date YYYY-MM-DD} {end date YYYY-MM-DD} {s3 bucket} {s3 path} [{aws region}]
+
+Example:
+
+```
+$ jsforce_s3_downloader 00OE0000002wlroMAA Labor__c.CreatedDate 5 2016-01-01 2016-01-04 monima test us-east-1
+Switching AWS region to us-east-1
+Starting here....
+Report:00OE0000002wlroMAA
+Output to:ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
+Start:2016-01-01
+...
+707 records
+First row: (L-5158662,a0iE000000MiWcxIAF)
+Last row : (L-5172382 a0iE000000MihGAIAZ)
+=============================
+Report       :00OE0000002wlroMAA
+Date range   :2016-01-01 to 2016-01-04
+Output to    :ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
+Done         :1087 records written.
+Async reports:4 - (succeeded:4,failed:0).
+Successfully uploaded data to monima/monima/ReportOut_00OE0000002wlroMAA_20160101-20160104_20160418030436.csv
+```
 
 
-This creates the file *ReportOutput_2016-01-01_to_2016-01-05.csv*.
-
-## Using it in AWS Lambda: TODO
-    	Document the S3 options and the new config
 
 ## Using the library in your NodeJS program.
+
+
 #### Configuration of the library
 ```javascript
 var config = {
@@ -188,6 +203,174 @@ var config = {
     // S3 key prefix if OUTPUTTO is set to "s3". This is the path where you want to store the output file.
 }
 ```
+
+## Using it in AWS Lambda: TODO
+To run the downloader in AWS Lambda, you need to create a lambda zip package. 
+If you have compiled node libraries, prepare this on a Linux machine.
+
++ Create an empty directory.
++ Install aws-sdk and jsforce_downloader
++ Create your lambda NodeJS script called index.js
++ Test your function locally
++ Create ZIP file and your AWS Lambda function.
++ Test your Lambda function.
+
+#### Prepare your environment
+
+```
+mkdir myfunction
+cd myfunction
+npm install aws-sdk jsforce_downloader
+```
+
+#### Source for your lambda NodeJS script
+
+Save this as index.js in the `myfunction` directory.
+
+```javascript
+// AWS Lambda wrapper around JSFORCE_Downloader
+'use strict';
+var jsforce_downloader = require('jsforce_downloader');
+/**
+ * Event JSON should be
+ * event.config = JSForce_Downloader config options that override the defaults.
+ * event.options = JSForce_Downloader parameters to download the report.
+ */
+exports.handler = (event, context, callback) => {
+        var config =  {
+                WRITE_TEMP_FILES: false,
+                REPORTPREFIX: "LambdaReportOut_",
+                OUTPUTTO: "s3"
+        };
+
+        if (event.config) {
+                for (var key in event.config)
+                        config[key]=event.config[key];
+        }
+        var options = event.options; 
+        if (options) {
+                jsforce_downloader.initialize(config);
+                jsforce_downloader.downloadreport(options.report, options.datefield,options.indexfield, options.startdate,options.enddate);
+        }       
+};
+```
+
+#### Source for your local test script.
+
++ Save the following code as test.js in the `myfunction` directory. 
++ Edit the event to put in your Salesforce and AWS details. `SF_USER`, `SF_PASSWD_WITH_TOKEN`, `S3BUCKET`, `S3KEYPREFIX`.
++ Ensure the environment variables `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` are set to your AWS credentials.
+
+```javascript
+var index = require('./index.js');
+// Create the event that will be passed to the handler.
+var event =
+{
+        "config":{
+                "MAX_CONCURRENT": 40,
+                "WAIT_BETWEEN_REQUESTS":500,
+                "REPORTSECTION": "T!T",
+                "WRITE_TEMP_FILES": false,
+                "SFOptions" : {
+                        "loginUrl": "https://login.salesforce.com"
+                },
+                "AWSCONFIG": {    
+                        "region": 'us-east-1'
+                },
+                "SF_USER" : "sfuser@sfuser.com",
+                "SF_PASSWD_WITH_TOKEN": "passwd_and_token",
+                "REPORTPREFIX": "LambdaReportOut_",
+                "OUTPUTTO": "s3",
+                "S3BUCKET": "monima",
+                "S3KEYPREFIX":"jsforce"
+
+        },
+        "options":{
+                "report": "_salesforce_reportid_like_00OE0000002whwz",
+                "datefield": "Case.CreatedDate",
+                "indexfield": 0,
+                "startdate":"2016-04-13",
+                "enddate":"2016-04-15"
+        }
+};
+index.handler(event);
+```
+
+#### Test your lambda function locally.
++ Run `node test.js` to test the lambda function locally.
++ Verify the file was successfully uploaded into S3.
+
+```sh
+$ node test.js
+Starting here....
+Report:00OE0000002whwz
+Output to:LambdaReportOut_00OE0000002whwz_20160413-20160413_20160417220418.csv
+Start:2016-04-13
+End:2016-04-15
+Logged into Salesforce
+username: ei_heartbeat@philips.com(EI Heartbeat)
+0:Start Range: (2016-04-13 to 2016-04-13)
+1:Start Range: (2016-04-14 to 2016-04-14)
+2:Start Range: (2016-04-15 to 2016-04-15)
+1:Returned Range: (2016-04-14 to 2016-04-14) :Success:413 rows in section T!T
+413 records
+...
+=============================
+Report       :00OE0000002whwz
+Date range   :2016-04-13 to 2016-04-15
+Output to    :LambdaReportOut_00OE0000002whwz_20160413-20160415_20160417220418.csv
+Done         :1232 records written.
+Async reports:3 - (succeeded:3,failed:0).
+Successfully uploaded data to monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160417220418.csv
+```
+
+### Create and test the AWS Lambda function
++ Setup your AWS CLI if you want to use the command line to create your lambda function. 
+If you want to use the Web console, you don't need the AWS CLI. [Instructions for CLI setup](http://docs.aws.amazon.com/lambda/latest/dg/setup-awscli.html).
+
+#### Packaging the lambda function
++ Amazon has documented the process in their document ["Creating a Deployment Package (Node.js)".](http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html)
++ From the `myfunction` directory, run the following on the command line.
+```
+zip -rq function index.js node_modules README.md
+```
++ This will create a ZIP file for your lambda function and exclude the test.js file which has your credentials.
+
+#### Create the Lambda function
++ You can use the Web console instead of the following steps. In the Web console, 
+
++ Create a lambda function with 300 seconds timeout, upload the function.zip file, run it 
+```
+aws lambda create-function \
+--region us-east-1 \
+--function-name DownloadSFReport \
+--zip-file fileb://./function.zip \
+--role role-arn \
+--handler index.handler \
+--runtime runtime \
+--profile adminuser \
+--timeout 300 \
+--memory-size 1024
+```
+
+#### Test the Lambda function
++ Copy the event from your test.js and use it to create the Test event for your Lambda function.
++ Test the function.
+
+### AWS errors and workarounds
+
++ `[PermanentRedirect: The bucket you are attempting to access must be addressed using the specified endpoint.` 
+You must specify a region to access your S3 bucket. Add this to your event.config or config.
+```
+    "AWSCONFIG": {
+        "region": 'us-east-1'
+    },
+``` 
+
++ `Function was terminated` or `Function seems to be stuck`.
+Lambda has a max timeout of 5 minutes and will terminate the function after that. 
+Check the max memory used for your stuck function, and increase it if you are at the limit.
+
 
 ## How it works
 The library does the following
