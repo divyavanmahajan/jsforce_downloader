@@ -356,18 +356,16 @@ Async reports:3 - (succeeded:3,failed:0).
 Successfully uploaded data to s3://monima/jsforce/LambdaReportOut_00OE0000002whwz_20160413-20160415_20160417220418.csv
 ```
 
-#### Packaging and creating the lambda function
+#### Setup AWS CLI
 + Setup your AWS CLI if you want to use the command line to create your lambda function. 
 If you want to use the Web console, you don't need the AWS CLI. [Instructions for CLI setup](http://docs.aws.amazon.com/lambda/latest/dg/setup-awscli.html).
-+ Amazon has documented the process in their document ["Creating a Deployment Package (Node.js)".](http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html)
 
-+ Edit the `makelambda.sh` script in the `myfunction` directory. 
-+ Edit the script to correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
+#### Packaging and creating the lambda function
+Edit the `makelambda.sh` script in the `myfunction` directory. Correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
 + `ARN` - Get the ARN for the Lambda role "lambda_basic_execution" or "lambda_basic_execution_with_vpc".
 [IAM Home](https://console.aws.amazon.com/iam/home). View the details of the role and copy down its ARN. 
 It would look similar to `arn:aws:iam::854421518417:role/lambda_basic_execution`. 
 + `LAMBDAFN` - Choose a valid name for your Lambda function. 
-+ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
 + `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
 
 Script [makelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/makelambda.sh).
@@ -375,7 +373,6 @@ Script [makelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce
 #!/bin/sh
 ARN=arn:aws:iam::852391518417:role/lambda_basic_execution
 LAMBDAFN=DownloadSFReport
-EVENTFILE=./event.json
 AWSPROFILE=adminuser
 
 echo -- 1. Make function.zip --
@@ -434,11 +431,9 @@ $ sh ./makelambda.sh
 
 
 #### Invoke the Lambda function
-
-+ Edit the `invokelambda.sh` script in the `myfunction` directory. 
-+ Correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
+Edit the `invokelambda.sh` script in the `myfunction` directory. Correct the values for `LAMBDAFN`, `ARN`, `EVENTFILE` and `AWSPROFILE`.
 + `LAMBDAFN` - Choose a valid name for your Lambda function. 
-+ `EVENTFILE` - Copy the event JSON from your test.js and save it into event.json. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
++ `EVENTFILE` - We will reuse the event.json that you edited earlier. Check that it is valid JSON (all keys and values are quoted). [JSON Lint](jsonlint.com) is a quick and easy way to check the validity.
 + `AWSPROFILE` - Set this to the correct "profilename" that you setup during the AWS CLI setup. If you don't remember try checking the file `~/.aws/credentials`.
 
 Script [invokelambda.sh](https://raw.githubusercontent.com/divyavanmahajan/jsforce_downloader/master/lambda/invokelambda.sh).
@@ -463,13 +458,11 @@ Run the script to invoke the function.
 
 ```
 $ sh ./invokelambda.sh
-
-```
--- 4. Invoke DownloadSFReport with event.json --
-{
-    "LogResult": "base64-encoded-log-data", 
-    "StatusCode": 200
-}
+    -- 4. Invoke DownloadSFReport with event.json --
+    {
+        "LogResult": "base64-encoded-log-data", 
+        "StatusCode": 200
+    }
 ```
 
 The logresult data in the response is `base64-encoded`. On Linux and Mac, you can use the base64 command to decode the log. 
