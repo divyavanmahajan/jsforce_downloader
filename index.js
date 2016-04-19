@@ -159,7 +159,7 @@ module.exports.downloadCommandS3 = function() {
 }
 
 module.exports.downloadreport_file = function(_reportID, _startDate, _endDate) {
-    var today = lastUpdate.format('YYYYMMDDHHMMSS');
+    var today = lastUpdate.format('YYYYMMDDHHmmss');
     var filename = config.REPORTPREFIX + _reportID + '_'
         + StartDate.format("YYYYMMDD") + '-'
         + EndDate.format("YYYYMMDD") + '_'
@@ -654,12 +654,13 @@ function generateMySQLTable(reportID, columns, info) {
         cname = cname.replace(/\./g, '_');
 
         sql_create = sql_create + "\n  " + cname + "_label varchar(255) DEFAULT NULL,";
-        if (i > 0) {
+        if (i >= 0) {
             sql_create = sql_create + "\n  " + cname + "_value " + sqltype + " DEFAULT NULL,";
         } else {
             // Setup a field as primary key so Redshift can use OVERWRITE_INSERT mode.
-            i = i + 1;
-            sql_create = sql_create + "\n  " + cname + "_value " + sqltype + " PRIMARY KEY,";
+            // This may be more dangerous since the wrong field is selected as the primary key.
+            //i = i + 1;
+            //sql_create = sql_create + "\n  " + cname + "_value " + sqltype + " PRIMARY KEY,";
         }
         sql_insert_columns = sql_insert_columns + cname + "_label,";
         sql_insert_columns = sql_insert_columns + cname + "_value,";
