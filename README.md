@@ -254,6 +254,7 @@ Before you can use the report download function, you must initialize the library
 `result`         | CSV data set on success.
 `reportName`     | Name of the report from the metadata.
 `reportDescribe` | JSON metadata returned by report.describe()
+`reportRows`     | Number of rows exported.
 
 
 ## Using it in AWS Lambda

@@ -82,7 +82,7 @@ module.exports.s3outputkey = "";
 module.exports.result = ""; // CSV data set is exposed
 module.exports.reportName = ""; // Fetched from Metadata
 module.exports.reportDescribe = {}; // Result of Report.Describe
-
+module.exports.reportRows = 0; // Number of rows exported. It is non-zero only when all steps were successfully completed.
 module.exports.initialize = function(_config) {
     config.WRITE_TEMP_FILES = fs.existsSync('./tmp');
 
@@ -232,6 +232,7 @@ module.exports.downloadreport = function(_reportID, _datefield, _indexfieldOffse
         }).then(function() {
             return getReportForDateRange(StartDate, EndDate, "days");
         }, writeOutErrorFn('login')).then(function() {
+            module.exports.reportRows = global_written_count;
             console.log("=============================");
             console.log("Report        :" + module.exports.reportName + " ("+reportID+")");
             console.log("Date range    :" + StartDate.format('YYYY-MM-DD') + " to " + EndDate.format('YYYY-MM-DD'));
