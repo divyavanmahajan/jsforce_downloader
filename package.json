@@ -1,6 +1,6 @@
 {
   "name": "jsforce_downloader",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Extract report data and report metadata from Salesforce. Download more than 2000 rows, asynchronously. Report is downloaded a day at a time with a standard date filter. It supports Tabular, Summary and Matrix reports. It can run in AWS Lambda and has built in support for sending the report data directly to S3. GZIP compression is supported for the output files.",
   "main": "index.js",
   "scripts": {
