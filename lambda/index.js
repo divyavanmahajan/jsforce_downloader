@@ -30,7 +30,7 @@ exports.handler = (event, context, callback) => {
             }, function(err) {
                 console.error(err);
                 if (typeof callback == "function") {
-                    callback(err, null);
+                    callback(err);
                 }
 
             });

@@ -635,8 +635,8 @@ function generateMySQLTable(reportID, columns, info) {
         if (col.dataType == 'date') sqltype = "datetime";
         if (col.dataType == 'time') sqltype = "varchar(4000)";
         if (col.dataType == 'datetime') sqltype = "datetime";
-        if (col.dataType == 'currency') sqltype = "double";
-        if (col.dataType == 'double') sqltype = "double";
+        if (col.dataType == 'currency') sqltype = "numeric";
+        if (col.dataType == 'double') sqltype = "numeric";
         if (col.dataType == 'int') sqltype = "int";
         if (col.dataType == 'picklist') sqltype = "varchar(255)";
         if (col.dataType == 'multipicklist') sqltype = "varchar(4000)";
@@ -693,7 +693,15 @@ function generateMySQLTable(reportID, columns, info) {
         + " TRUNCATECOLUMNS  TRIMBLANKS REGION 'us-east-1';"
         + "\n select top 20 * from stl_load_errors order by starttime desc;"
         + "\n select count(*) from " + sql_table + ";";
-
+    var sqlcmds = {
+        "create":sql_create,
+        "mysql_insert":sql_insert,
+        "mysql_load":sql_mysql_load,
+        "redshift_copy":sql_rs_load,
+        "redshift_copy_gz":sql_rs_load_gz
+    };
+    var file1 = 'ReportSQL_' + reportID + '-sql.json';
+    fs.writeFile(file1,JSON.stringify(sqlcmds));
     var filename = 'ReportSQL_' + reportID + '.sql'
     fs.open(filename, "w", function(err, fd) {
         if (err) {
