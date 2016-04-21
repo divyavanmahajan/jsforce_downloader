@@ -83,7 +83,8 @@ module.exports.result = ""; // CSV data set is exposed
 module.exports.reportName = ""; // Fetched from Metadata
 module.exports.reportDescribe = {}; // Result of Report.Describe
 module.exports.reportRows = 0; // Number of rows exported. It is non-zero only when all steps were successfully completed.
-module.exports.initialize = function(_config) {
+module.exports.sqlTypes = []; // SQL Types for report columns
+module.exports.initialize = function (_config) {
     config.WRITE_TEMP_FILES = fs.existsSync('./tmp');
 
     if (typeof (_config) != "undefined") {
@@ -109,7 +110,7 @@ module.exports.initialize = function(_config) {
  * Command line:
  * downloadreport reportid datefield indexfieldoffset startdate enddate
  */
-module.exports.downloadCommand = function() {
+module.exports.downloadCommand = function () {
     if (process.argv.length < 7) {
         console.error('Usage: ' + process.argv[0] + ' ' + process.argv[1] + ' reportid datefield indexfieldOffset 2016-01-01 2016-01-05 [10, [T!T]]');
         console.error('\t10 - Number of concurrent requests.');
@@ -126,7 +127,13 @@ module.exports.downloadCommand = function() {
             config.REPORTSECTION = process.argv[8];
         }
         module.exports.initialize();
-        module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
+        module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]).then(function () {
+            console.log("Finished");
+            process.exit(0);
+        }, function (err) {
+            console.error("Error during processing");
+            process.exit(-1);
+        });
     }
 }
 
@@ -139,7 +146,7 @@ module.exports.downloadCommand = function() {
  * Command line:
  * downloadreport reportid datefield indexfieldoffset startdate enddate s3bucket s3path
  */
-module.exports.downloadCommandS3 = function() {
+module.exports.downloadCommandS3 = function () {
     if (process.argv.length < 9) {
         console.error('Usage: ' + process.argv[0] + ' ' + process.argv[1] + ' reportid datefield indexfieldOffset 2016-01-01 2016-01-05 s3bucket s3path [awsregion]');
         console.error('\n\tPlease ensure you set the environment variable AWS_ACCESS_KEY, AWS_SECRET_KEY, SF_USER, SF_PASSWD_WITH_TOKEN');
@@ -154,11 +161,17 @@ module.exports.downloadCommandS3 = function() {
             console.log('Switching AWS region to ' + config.AWSCONFIG.region);
         }
         module.exports.initialize();
-        module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
+        module.exports.downloadreport(process.argv[2], process.argv[3], process.argv[4], process.argv[5], process.argv[6]).then(function () {
+            console.log("Finished");
+            process.exit(0);
+        }, function (err) {
+            console.error("Error during processing");
+            process.exit(-1);
+        });
     }
 }
 
-module.exports.downloadreport_file = function(_reportID, _startDate, _endDate) {
+module.exports.downloadreport_file = function (_reportID, _startDate, _endDate) {
     var today = lastUpdate.format('YYYYMMDDHHmmss');
     var filename = config.REPORTPREFIX + _reportID + '_'
         + StartDate.format("YYYYMMDD") + '-'
@@ -183,7 +196,7 @@ module.exports.downloadreport_file = function(_reportID, _startDate, _endDate) {
  * @param {String} _password - password with security token.
  */
 
-module.exports.downloadreport = function(_reportID, _datefield, _indexfieldOffset, _startDate, _endDate) {
+module.exports.downloadreport = function (_reportID, _datefield, _indexfieldOffset, _startDate, _endDate) {
     conn = new jsforce.Connection(config.SFOptions);
 
     reportID = _reportID;
@@ -216,32 +229,32 @@ module.exports.downloadreport = function(_reportID, _datefield, _indexfieldOffse
     console.log("End:" + EndDate.format('YYYY-MM-DD'));
 
     return conn.login(config.SF_USER, config.SF_PASSWD_WITH_TOKEN).
-        then(function() {
+        then(function () {
             return conn.identity();
-        }, function(err) {
+        }, function (err) {
             console.error(err);
             console.error('Please check you have set the following environment variables');
             console.error('SF_USER');
             console.error('SF_PASSWD_WITH_TOKEN=password and security token');
-        }).then(function(res) {
+        }).then(function (res) {
             console.log('Logged into Salesforce');
             //console.log("organization ID: " + res.organization_id);
             //console.log("user ID: " + res.user_id);
             console.log("username: " + res.username + "(" + res.display_name + ")");
 
-        }).then(function() {
+        }).then(function () {
             return getReportForDateRange(StartDate, EndDate, "days");
-        }, writeOutErrorFn('login')).then(function() {
+        }, writeOutErrorFn('login')).then(function () {
             module.exports.reportRows = global_written_count;
             console.log("=============================");
-            console.log("Report        :" + module.exports.reportName + " ("+reportID+")");
+            console.log("Report        :" + module.exports.reportName + " (" + reportID + ")");
             console.log("Date range    :" + StartDate.format('YYYY-MM-DD') + " to " + EndDate.format('YYYY-MM-DD'));
             console.log("Output to     :" + OutputFile);
-            console.log('Record count  :' + global_written_count );
+            console.log('Record count  :' + global_written_count);
             console.log('Async requests:' + async_report_requests + ' - (succeeded:' + async_report_success + ',failed:' + (async_report_requests - async_report_success) + ').');
             return module.exports.result;
         }, writeOutErrorFn('jsforce_report.downloadreport'))
-        .catch(function(err) {
+        .catch(function (err) {
             console.error(err);
         });
 }
@@ -252,7 +265,7 @@ module.exports.downloadreport = function(_reportID, _datefield, _indexfieldOffse
 
 
 function writeOutErrorFn(message) {
-    return function(err) {
+    return function (err) {
         console.error(message + ":" + err);
     };
 }
@@ -267,13 +280,13 @@ function getReportForDateRange(startdate, enddate, interval) {
     }
     var data = '';
     //console.log('GenUtilization');
-    var promise = prepareCSV(reportID, data).then(function(stringifier) {
+    var promise = prepareCSV(reportID, data).then(function (stringifier) {
         var getInstancePromises = [];
         var concurrentPromises = new Array(config.MAX_CONCURRENT);
         var instances = [];
         var i = 0;
         var j = 0;
-        range1.by(interval, function(start) {
+        range1.by(interval, function (start) {
             var t = j; // Make a local copy of j so it stays frozen
             //t=i;i=i+1;
             var st = start.clone();
@@ -286,7 +299,7 @@ function getReportForDateRange(startdate, enddate, interval) {
                     , writeOutErrorFn(t + ":Error starting report for range: " + start.format('YYYY-MM-DD') + " - " + end.format('YYYY-MM-DD') + ":")
                 );
             } else {
-                concurrentPromises[j] = concurrentPromises[j].then(function() {
+                concurrentPromises[j] = concurrentPromises[j].then(function () {
                     console.log(t + ":Chain Range: " + start.format() + " - " + end.format());
                     var promise2 = startAsyncReport(start, end).then(
                         processAsyncReportInstanceFn(instances, t, st, end, stringifier)
@@ -297,7 +310,7 @@ function getReportForDateRange(startdate, enddate, interval) {
             j = (j + 1) % config.MAX_CONCURRENT;
             async_report_requests++;
         });
-        return Promise.all(concurrentPromises).then(function() {
+        return Promise.all(concurrentPromises).then(function () {
             stringifier.end();
             return onFinishWriteFile();
         }, writeOutErrorFn("PromiseAll error"));
@@ -315,8 +328,8 @@ function onFinishWriteFile() {
     }
 
     if (config.OUTPUTTO == "file") {
-        return new Promise(function(fulfill, reject) {
-            fs.writeFile(OutputFile, data, function(err, res) {
+        return new Promise(function (fulfill, reject) {
+            fs.writeFile(OutputFile, data, function (err, res) {
                 if (err) {
                     console.error(err);
                     reject(err);
@@ -345,8 +358,8 @@ function s3WriteFile(filename, data) {
 function s3putobject(bucket, key, data) {
     var s3 = new AWS.S3();
     var params = { Bucket: bucket, Key: key, Body: data };
-    return new Promise(function(fulfill, reject) {
-        s3.putObject(params, function(err, data) {
+    return new Promise(function (fulfill, reject) {
+        s3.putObject(params, function (err, data) {
             if (err) {
                 console.error(err);
                 reject(err);
@@ -368,15 +381,16 @@ function prepareCSV(reportID) {
     // Write out the data
     var stringifier = stringify({ delimiter: ',' });
 
-    stringifier.on('readable', function() {
+    stringifier.on('readable', function () {
         while (row = stringifier.read()) {
+
             data += row;
         }
     });
-    stringifier.on('error', function(err) {
+    stringifier.on('error', function (err) {
         console.log(err.message);
     });
-    stringifier.on('finish', function() {
+    stringifier.on('finish', function () {
         // onFinishWriteFile(data);
         module.exports.result = data;
         // TODO _ Compression??
@@ -384,19 +398,23 @@ function prepareCSV(reportID) {
 
     //stringifier.pipe(fs.createWriteStream('data/outputDateRange.csv'));
     var report = conn.analytics.report(reportID);
-    return report.describe().then(function(result) {
+    return report.describe().then(function (result) {
         var columns = ["lastUpdated"];
         module.exports.reportDescribe = result;
         module.exports.reportName = result.reportMetadata.name;
-        console.log("Report name: "+module.exports.reportName);
-        result.reportMetadata.detailColumns.map(function(cname) {
+        module.exports.sqlTypes = ["datetime"];
+        console.log("Report name: " + module.exports.reportName);
+        result.reportMetadata.detailColumns.map(function (cname) {
+            var sqlType = convertSOQLTypeToSQL(result.reportExtendedMetadata.detailColumnInfo[cname].dataType, "varchar(255)");
+            module.exports.sqlTypes.push(sqlType);
+
             cname = cname.replace(/\./g, '_');
             columns.push(cname + "_label");
             columns.push(cname + "_value");
         });
         stringifier.write(columns);
         return stringifier;
-    }, function(err) {
+    }, function (err) {
         console.err('prepareCSV: Cannot get report metadata:' + err);
     });
 }
@@ -426,21 +444,21 @@ function startAsyncReport(startdate, enddate) {
 // Create a callbackfunction for processing after an async report is submitted.
 //
 function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
-    return function(instance) {
+    return function (instance) {
         async_report_success++;
         instances.push(instance); // Can be removed for large report data sets
         var report = conn.analytics.report(reportID);
         var reportinstance = report.instance(instance.id);
-        var promise0 = delay(config.WAIT_BETWEEN_REQUESTS).then(function() {
+        var promise0 = delay(config.WAIT_BETWEEN_REQUESTS).then(function () {
             //var promise1=reportinstance.retrieve().then(function(results) {
-            var promise1 = waitForInstance(reportinstance, config.WAIT_BETWEEN_REQUESTS).then(function(results) {
+            var promise1 = waitForInstance(reportinstance, config.WAIT_BETWEEN_REQUESTS).then(function (results) {
                 var message = "";
                 var rSection = results.factMap[config.REPORTSECTION];
                 if (typeof rSection === "undefined" || rSection.rows.length == 0) {
                     message = "No data in section " + config.REPORTSECTION;
                     if (config.WRITE_TEMP_FILES) {
-                        var tempfile = getTempFilename(n,true); // Empty file
-                        console.log("  Writing out :"+tempfile);
+                        var tempfile = getTempFilename(n, true); // Empty file
+                        console.log("  Writing out :" + tempfile);
                         try {
                             fs.writeFileSync(tempfile, JSON.stringify(results));
                         } catch (ferr) {
@@ -450,8 +468,8 @@ function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
                 } else {
                     message = rSection.rows.length + " rows in section " + config.REPORTSECTION;
                     if (config.WRITE_TEMP_FILES) {
-                        var tempfile = getTempFilename(n,false);
-                        console.log("  Writing out :"+tempfile);
+                        var tempfile = getTempFilename(n, false);
+                        console.log("  Writing out :" + tempfile);
                         try {
                             fs.writeFileSync(tempfile, JSON.stringify(results));
                         } catch (ferr) {
@@ -489,13 +507,13 @@ function processAsyncReportInstanceFn(instances, t, st, end, stringifier) {
     };
 }
 
-function getTempFilename(n,empty) {
+function getTempFilename(n, empty) {
     var tempfile = "tmp/" + OutputFile;
     if (config.GZIP) {
         tempfile = tempfile.slice(0, -3); // remove .gz
     }
     tempfile = tempfile.slice(0, -4); // remove .csv
-    tempfile = tempfile +'-'+ n;
+    tempfile = tempfile + '-' + n;
     if (empty) {
         tempfile = tempfile + ".empty";
     }
@@ -506,18 +524,18 @@ function getTempFilename(n,empty) {
 function waitForInstance(reportinstance) {
     var waitpromise = Promise.resolve();
     function checkStatus() {
-        return waitpromise.then(function() {
+        return waitpromise.then(function () {
             return delay(config.WAIT_BETWEEN_REQUESTS)
-                .then(function() {
+                .then(function () {
                     return reportinstance.retrieve()
                 })
-                .then(function(result) {
+                .then(function (result) {
                     var status = result.attributes.status;
                     if (status != "Success" && status != "Error") {
                         return checkStatus();
                     }
                     return result;
-                }, function(err) {
+                }, function (err) {
                     console.error('Cannot retrieve instance status:' + err);
                 });
         });
@@ -526,12 +544,13 @@ function waitForInstance(reportinstance) {
 }
 
 function delay(time) {
-    return new Promise(function(fulfill) {
+    return new Promise(function (fulfill) {
         setTimeout(fulfill, time);
     });
 }
 
-
+var regex_newline = new RegExp(/[\r\n]+/g);
+var regex_quote = new RegExp(/'/g);
 function writeResult(stringifier, results) {
     //console.log('Writeresult:'+stringifier);
     var rows = results.factMap[config.REPORTSECTION].rows;
@@ -545,11 +564,39 @@ function writeResult(stringifier, results) {
             //console.log(JSON.stringify(rowval));
             //console.log('Writeresult:'+k);
             var datacells = rows[k]["dataCells"];
-            var rowout = [lastUpdate.format('YYYY-MM-DD[T]HH:MM:SS[Z]')]; // Update date/time - is the same as the start of the download.
+            var rowout = [lastUpdate.format('YYYY-MM-DD[T]HH:mm:ss[Z]')]; // Update date/time - is the same as the start of the download.
             var k1;
             for (k1 = 0; k1 < datacells.length; k1++) {
-                rowout.push(datacells[k1].label);
-                rowout.push(datacells[k1].value);
+                var sqltype = module.exports.sqlTypes[k1 + 1];
+                var label = datacells[k1].label;
+                var value = datacells[k1].value;
+                
+                if (sqltype.indexOf("varchar") > -1) {
+                    // Remove single quotes, newlines and wrap strings with single quotes.
+                    // Truncate the string to the max length defined in the data type
+                    
+                    var len = 255;
+                    try {
+                        var s = sqltype.substring(sqltype.indexOf("varchar(")+8,sqltype.indexOf(")"));
+                        len = parseInt(s);
+                    } catch(err) {
+                        // Integer parsing error. Can be ignored.
+                        console.warn('Cannot get length of field:'+sqltype);
+                    }
+                    
+                    // Add quotes to the string
+                    if (value !== null) {
+                        label = label.replace(regex_newline,"--").substring(0,len);
+                        value = value.replace(regex_newline,"--").substring(0,len);
+                        label = "'" + label.replace(regex_quote, "-") + "'";
+                        value = "'" + value.replace(regex_quote, "-") + "'";
+                    }
+                    rowout.push(label);
+                    rowout.push(value);
+                } else {
+                    rowout.push(label);
+                    rowout.push(value);
+                }
             }
             //console.log(JSON.stringify(rowout));
             stringifier.write(rowout);
@@ -571,7 +618,7 @@ function writeResult(stringifier, results) {
  * @protected
  * @param {String} _reportID - Salesforce report identifier. You can get this from the URL when you are viewing the report.
  */
-module.exports.showMetadata = function(_reportID) {
+module.exports.showMetadata = function (_reportID) {
     conn = new jsforce.Connection(config.SFOptions);
 
     reportID = _reportID;
@@ -579,22 +626,22 @@ module.exports.showMetadata = function(_reportID) {
     OutputFile = 'ReportMeta_' + reportID + '.json';
 
     conn.login(config.SF_USER, config.SF_PASSWD_WITH_TOKEN).
-        then(function() {
+        then(function () {
             return conn.identity();
-        }, function(err) {
+        }, function (err) {
             console.error(err);
             console.error('Please check you have set the following environment variables');
             console.error('SF_USER');
             console.error('SF_PASSWD_WITH_TOKEN=password and security token');
-        }).then(function(res) {
+        }).then(function (res) {
             console.log('Logged into Salesforce');
             //console.log("username: " + res.username + "(" + res.display_name + ")");
-        }).then(function() {
+        }).then(function () {
             var report = conn.analytics.report(reportID);
             return report.describe();
-        }).then(function(result) {
+        }).then(function (result) {
             console.log("Columns");
-            result.reportMetadata.detailColumns.map(function(cname) {
+            result.reportMetadata.detailColumns.map(function (cname) {
                 var col = result.reportExtendedMetadata.detailColumnInfo[cname];
                 if (col) {
                     console.log("  " + cname + "\t" + col.dataType + "\t" + col.label);
@@ -606,7 +653,7 @@ module.exports.showMetadata = function(_reportID) {
             fs.writeFile(OutputFile, JSON.stringify(result, null, 2));
             generateMySQLTable(_reportID, result.reportMetadata.detailColumns, result.reportExtendedMetadata.detailColumnInfo);
         }, writeOutErrorFn('Report describe: Cannot get report metadata:'))
-        .catch(function(err) {
+        .catch(function (err) {
             console.error(err);
         });
     console.log("Requesting metadata for....");
@@ -614,6 +661,32 @@ module.exports.showMetadata = function(_reportID) {
     console.log("Output to:" + OutputFile);
 }
 
+function convertSOQLTypeToSQL(SOQLDataType, defaultSQLType) {
+    var sqltype = defaultSQLType;
+    // http://www.chiragmehta.info/chirag/2011/05/16/field-datatype-mapping-between-oraclesql-server-and-salesforce/
+    if (SOQLDataType == 'boolean') sqltype = "boolean";
+    if (SOQLDataType == 'date') sqltype = "datetime";
+    if (SOQLDataType == 'time') sqltype = "datetime";
+    if (SOQLDataType == 'datetime') sqltype = "datetime";
+    if (SOQLDataType == 'currency') sqltype = "numeric";
+    if (SOQLDataType == 'double') sqltype = "numeric";
+    if (SOQLDataType == 'int') sqltype = "int";
+    if (SOQLDataType == 'picklist') sqltype = "varchar(255)";
+    if (SOQLDataType == 'multipicklist') sqltype = "varchar(4000)";
+    if (SOQLDataType == 'id') sqltype = "varchar(18)";
+    if (SOQLDataType == 'reference') sqltype = "varchar(18)";
+    if (SOQLDataType == 'textarea') sqltype = "varchar(4000)";
+    if (SOQLDataType == 'email') sqltype = "varchar(255)";
+    if (SOQLDataType == 'phone') sqltype = "varchar(255)";
+    if (SOQLDataType == 'url') sqltype = "varchar(1000)";
+    if (SOQLDataType == 'anyType') sqltype = "varchar(4000)";
+    if (SOQLDataType == 'percent') sqltype = "decimal(5,2)";
+    if (SOQLDataType == 'combobox') sqltype = "varchar(4000)";
+    if (SOQLDataType == 'base64') sqltype = "varchar(4000)";
+    if (SOQLDataType == 'html') sqltype = "varchar(4000)";
+    if (SOQLDataType == 'string') sqltype = "varchar(4000)";
+    return sqltype;
+}
 function generateMySQLTable(reportID, columns, info) {
     var i = 0;
     var sql_insert;
@@ -627,30 +700,10 @@ function generateMySQLTable(reportID, columns, info) {
     sql_insert = sql_insert + "\nINSERT INTO " + sql_table;
     sql_insert_columns = " (lastUpdate,";
     sql_insert_values = " VALUES (?,";
-    columns.map(function(cname) {
+    columns.map(function (cname) {
         var col = info[cname];
-        var sqltype = "varchar(250)";
-        // http://www.chiragmehta.info/chirag/2011/05/16/field-datatype-mapping-between-oraclesql-server-and-salesforce/
-        if (col.dataType == 'boolean') sqltype = "boolean";
-        if (col.dataType == 'date') sqltype = "datetime";
-        if (col.dataType == 'time') sqltype = "varchar(4000)";
-        if (col.dataType == 'datetime') sqltype = "datetime";
-        if (col.dataType == 'currency') sqltype = "numeric";
-        if (col.dataType == 'double') sqltype = "numeric";
-        if (col.dataType == 'int') sqltype = "int";
-        if (col.dataType == 'picklist') sqltype = "varchar(255)";
-        if (col.dataType == 'multipicklist') sqltype = "varchar(4000)";
-        if (col.dataType == 'id') sqltype = "varchar(18)";
-        if (col.dataType == 'reference') sqltype = "varchar(18)";
-        if (col.dataType == 'textarea') sqltype = "varchar(4000)";
-        if (col.dataType == 'email') sqltype = "varchar(255)";
-        if (col.dataType == 'phone') sqltype = "varchar(255)";
-        if (col.dataType == 'url') sqltype = "varchar(1000)";
-        if (col.dataType == 'anyType') sqltype = "varchar(4000)";
-        if (col.dataType == 'percent') sqltype = "decimal(5,2)";
-        if (col.dataType == 'combobox') sqltype = "varchar(4000)";
-        if (col.dataType == 'base64') sqltype = "varchar(4000)";
-        if (col.dataType == 'string') sqltype = "varchar(4000)";
+        var sqltype = convertSOQLTypeToSQL(col.dataType, "varchar(255)");
+
         cname = cname.replace(/\./g, '_');
 
         sql_create = sql_create + "\n  " + cname + "_label varchar(255) DEFAULT NULL,";
@@ -695,16 +748,16 @@ function generateMySQLTable(reportID, columns, info) {
         + "\n select top 20 * from stl_load_errors order by starttime desc;"
         + "\n select count(*) from " + sql_table + ";";
     var sqlcmds = {
-        "create":sql_create,
-        "mysql_insert":sql_insert,
-        "mysql_load":sql_mysql_load,
-        "redshift_copy":sql_rs_load,
-        "redshift_copy_gz":sql_rs_load_gz
+        "create": sql_create,
+        "mysql_insert": sql_insert,
+        "mysql_load": sql_mysql_load,
+        "redshift_copy": sql_rs_load,
+        "redshift_copy_gz": sql_rs_load_gz
     };
     var file1 = 'ReportSQL_' + reportID + '-sql.json';
-    fs.writeFile(file1,JSON.stringify(sqlcmds));
+    fs.writeFile(file1, JSON.stringify(sqlcmds));
     var filename = 'ReportSQL_' + reportID + '.sql'
-    fs.open(filename, "w", function(err, fd) {
+    fs.open(filename, "w", function (err, fd) {
         if (err) {
             console.error(err);
         } else {
@@ -746,7 +799,7 @@ function generateMySQLTable(reportID, columns, info) {
  * Command line:
  * download_meta reportid
  */
-module.exports.showMetadataCmd = function() {
+module.exports.showMetadataCmd = function () {
     if (process.argv.length < 2) {
         console.error('Usage: ' + process.argv[0] + ' ' + process.argv[1] + ' reportid');
         return;

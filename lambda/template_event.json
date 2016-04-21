@@ -1,0 +1,28 @@
+{
+        "config":{
+                "MAX_CONCURRENT": 40,
+                "WAIT_BETWEEN_REQUESTS":500,
+                "REPORTSECTION": "T!T",
+                "WRITE_TEMP_FILES": false,
+                "SFOptions" : {
+                        "loginUrl": "https://login.salesforce.com"
+                },
+                "AWSCONFIG": {    
+                        "region": "us-east-1"
+                },
+		"SF_USER" : "sfuser@sf.com",
+                "SF_PASSWD_WITH_TOKEN": "passwd and token",
+                "REPORTPREFIX": "LambdaReportOut_",
+                "OUTPUTTO": "s3",
+                "GZIP":true,
+                "S3BUCKET": "bucket",
+                "S3KEYPREFIX":"jsforce/staging/00OE0000002whwz/in"
+        },
+        "options":{
+                "report": "00OE0000002whwz",
+                "datefield": "Case.CreatedDate",
+                "indexfield": 0,
+                "startdate":"2016-01-01",
+                "enddate":"2016-04-15"
+        }
+}

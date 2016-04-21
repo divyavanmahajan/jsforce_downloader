@@ -1,0 +1,134 @@
+{
+    "parameters": [
+        {
+            "type": "String", 
+            "id": "*myRedshiftPassword", 
+            "description": "Redshift password"
+        }, 
+        {
+            "type": "String", 
+            "id": "myRedshiftDbName", 
+            "description": "Redshift database name"
+        }, 
+        {
+            "isArray": "true", 
+            "description": "Redshift security group(s)", 
+            "watermark": "security group name", 
+            "default": "default", 
+            "helpText": "The names of one or more security groups that are assigned to the Redshift cluster.", 
+            "type": "String", 
+            "id": "myRedshiftSecurityGrps"
+        }, 
+        {
+            "type": "String", 
+            "id": "myRedshiftUsername", 
+            "description": "Redshift username"
+        }, 
+        {
+            "description": "Create table SQL query", 
+            "watermark": "CREATE TABLE IF NOT EXISTS #{tableName} (id varchar(255), name varchar(255), address varchar(255), primary key(id)) distkey(id) sortkey(id);", 
+            "type": "String", 
+            "helpText": "The SQL statement to create the Redshift table if it does not already exist.", 
+            "optional": "true", 
+            "id": "myRedshiftCreateTableSql"
+        }, 
+        {
+            "type": "String", 
+            "helpText": "The name of an existing table or a new table that will be created based on the create table SQL query parameter below.", 
+            "id": "myRedshiftTableName", 
+            "description": "Redshift table name"
+        }, 
+        {
+            "description": "Table insert mode", 
+            "default": "OVERWRITE_EXISTING", 
+            "helpText": "Determines how to handle pre-existing data in the target table that overlaps with rows in the data to be loaded.", 
+            "type": "String", 
+            "id": "myInsertMode", 
+            "helpLink": "https://docs.aws.amazon.com/console/datapipeline/redshiftcopyactivity"
+        }, 
+        {
+            "type": "AWS::S3::ObjectKey", 
+            "helpText": "The S3 folder where one or more input files are located.", 
+            "id": "myInputS3Loc", 
+            "description": "Input S3 folder"
+        }, 
+        {
+            "description": "Redshift JDBC connection string", 
+            "type": "String", 
+            "id": "myRedshiftJdbcConnectStr", 
+            "watermark": "jdbc:postgresql://endpoint:port/database?tcpKeepAlive=true"
+        }, 
+        {
+            "isArray": "true", 
+            "description": "Primary keys", 
+            "type": "String", 
+            "helpText": "The names of all primary key columns in the Redshift table used to merge existing data with new data.", 
+            "optional": "true", 
+            "id": "myPrimaryKeys", 
+            "helpLink": "https://docs.aws.amazon.com/console/datapipeline/dp_object_redshiftdatanode"
+        }
+    ], 
+    "objects": [
+        {
+            "commandOptions": "GZIP DELIMITER ',' DATEFORMAT 'auto' TIMEFORMAT 'auto' \nIGNOREHEADER 1 EMPTYASNULL BLANKSASNULL REMOVEQUOTES IGNOREBLANKLINES \nTRUNCATECOLUMNS  TRIMBLANKS", 
+            "insertMode": "#{myInsertMode}", 
+            "workerGroup": "myWorkerGroup", 
+            "input": {
+                "ref": "S3InputDataNode"
+            }, 
+            "output": {
+                "ref": "DestRedshiftTable"
+            }, 
+            "type": "RedshiftCopyActivity", 
+            "id": "RedshiftLoadActivity", 
+            "name": "RedshiftLoadActivity"
+        }, 
+        {
+            "pipelineLogUri": "s3://hissreporting/pipeline", 
+            "name": "Default", 
+            "failureAndRerunMode": "CASCADE", 
+            "resourceRole": "DataPipelineDefaultResourceRole", 
+            "role": "DataPipelineDefaultRole", 
+            "scheduleType": "ONDEMAND", 
+            "id": "Default"
+        }, 
+        {
+            "directoryPath": "#{myInputS3Loc}", 
+            "type": "S3DataNode", 
+            "id": "S3InputDataNode", 
+            "name": "S3InputDataNode"
+        }, 
+        {
+            "createTableSql": "#{myRedshiftCreateTableSql}", 
+            "name": "DestRedshiftTable", 
+            "database": {
+                "ref": "RedshiftCluster"
+            }, 
+            "tableName": "#{myRedshiftTableName}", 
+            "primaryKeys": "#{myPrimaryKeys}", 
+            "type": "RedshiftDataNode", 
+            "id": "DestRedshiftTable"
+        }, 
+        {
+            "username": "#{myRedshiftUsername}", 
+            "name": "RedshiftCluster", 
+            "connectionString": "#{myRedshiftJdbcConnectStr}", 
+            "databaseName": "#{myRedshiftDbName}", 
+            "*password": "#{*myRedshiftPassword}", 
+            "type": "RedshiftDatabase", 
+            "id": "RedshiftCluster"
+        }
+    ], 
+    "values": {
+        "myRedshiftSecurityGrps": "default", 
+        "myRedshiftJdbcConnectStr": "jdbc:redshift://test.us-east-1.redshift.amazonaws.com:5439/dev", 
+        "myRedshiftUsername": "awsadmin", 
+        "*myRedshiftPassword": "password", 
+        "myInsertMode": "OVERWRITE_EXISTING", 
+        "myInputS3Loc": "s3://testbucket/location",
+        "myRedshiftTableName": "T00OE0000002wlroMAA", 
+        "myRedshiftDbName": "dev", 
+        "myPrimaryKeys": "", 
+        "myRedshiftCreateTableSql": ""
+    }
+}
