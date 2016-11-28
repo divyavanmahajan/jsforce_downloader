@@ -41,7 +41,7 @@ var config = {
     // [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) 
     // - in the section decode the Fact Map. 
 
-    WRITE_TEMP_FILES: false,
+    WRITE_TEMP_FILES: true,
     // Store output of each async report to the tmp subdirectory.
 
     SFOptions: {
@@ -85,7 +85,7 @@ module.exports.reportDescribe = {}; // Result of Report.Describe
 module.exports.reportRows = 0; // Number of rows exported. It is non-zero only when all steps were successfully completed.
 module.exports.sqlTypes = []; // SQL Types for report columns
 module.exports.initialize = function (_config) {
-    config.WRITE_TEMP_FILES = fs.existsSync('./tmp');
+    //config.WRITE_TEMP_FILES = fs.existsSync('./tmp');
 
     if (typeof (_config) != "undefined") {
         for (var key in _config)
@@ -570,8 +570,8 @@ function writeResult(stringifier, results) {
                 var sqltype = module.exports.sqlTypes[k1 + 1];
                 var label = datacells[k1].label;
                 var value = datacells[k1].value;
-                label = label.replace(regex_quote,"-");
-                value = value.replace(regex_quote,"-");
+                //label = label.replace(regex_quote,"-");
+                //value = value.replace(regex_quote,"-");
                 
                 if (sqltype.indexOf("varchar") > -1) {
                     // Remove single quotes, newlines and wrap strings with single quotes.
