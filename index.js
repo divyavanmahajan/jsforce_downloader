@@ -238,7 +238,7 @@ module.exports.downloadreport = function (_reportID, _datefield, _indexfieldOffs
             console.error('SF_PASSWD_WITH_TOKEN=password and security token');
         }).then(function (res) {
             console.log('Logged into Salesforce');
-            //console.log("organization ID: " + res.organization_id);
+            console.log("organization ID: " + res.organization_id);
             //console.log("user ID: " + res.user_id);
             console.log("username: " + res.username + "(" + res.display_name + ")");
 
@@ -550,7 +550,7 @@ function delay(time) {
 }
 
 var regex_newline = new RegExp(/[\r\n]+/g);
-var regex_quote = new RegExp(/'/g);
+var regex_quote = new RegExp(/['"]/g);
 function writeResult(stringifier, results) {
     //console.log('Writeresult:'+stringifier);
     var rows = results.factMap[config.REPORTSECTION].rows;
@@ -570,6 +570,8 @@ function writeResult(stringifier, results) {
                 var sqltype = module.exports.sqlTypes[k1 + 1];
                 var label = datacells[k1].label;
                 var value = datacells[k1].value;
+                label = label.replace(regex_quote,"-");
+                value = value.replace(regex_quote,"-");
                 
                 if (sqltype.indexOf("varchar") > -1) {
                     // Remove single quotes, newlines and wrap strings with single quotes.
