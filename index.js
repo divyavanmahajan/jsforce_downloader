@@ -41,7 +41,7 @@ var config = {
     // [Salesforce Analytics REST API guide](https://resources.docs.salesforce.com/sfdc/pdf/salesforce_analytics_rest_api.pdf) 
     // - in the section decode the Fact Map. 
 
-    WRITE_TEMP_FILES: true,
+    WRITE_TEMP_FILES: false,
     // Store output of each async report to the tmp subdirectory.
 
     SFOptions: {
@@ -85,7 +85,7 @@ module.exports.reportDescribe = {}; // Result of Report.Describe
 module.exports.reportRows = 0; // Number of rows exported. It is non-zero only when all steps were successfully completed.
 module.exports.sqlTypes = []; // SQL Types for report columns
 module.exports.initialize = function (_config) {
-    //config.WRITE_TEMP_FILES = fs.existsSync('./tmp');
+    config.WRITE_TEMP_FILES = fs.existsSync('./tmp');
 
     if (typeof (_config) != "undefined") {
         for (var key in _config)
@@ -401,6 +401,7 @@ function prepareCSV(reportID) {
     return report.describe().then(function (result) {
         var columns = ["lastUpdated"];
         module.exports.reportDescribe = result;
+        module.exports.reportMetadata = result.reportMetadata;
         module.exports.reportName = result.reportMetadata.name;
         module.exports.sqlTypes = ["datetime"];
         console.log("Report name: " + module.exports.reportName);
@@ -420,16 +421,21 @@ function prepareCSV(reportID) {
 }
 
 function startAsyncReport(startdate, enddate) {
-    var metadata = {
-        reportMetadata: {
-            "standardDateFilter": {
+    var standarddatefilter = {
                 "column": datefield,
                 "durationValue": "CUSTOM",
                 "endDate": enddate.format('YYYY-MM-DD'),
                 "startDate": startdate.format('YYYY-MM-DD')
-            }
-        }
-    };
+            };
+    // Old version - just sent metadata.
+    // However bucket fields require the full report metadata to work or you get a BAD_REQUEST: Invalid value specified Bucket_field_xxxx. 
+    //var metadata = {
+    //    reportMetadata: {
+    //        "standardDateFilter": standarddatefilter
+    //    }
+    //};
+    metadata.reportMetadata = module.exports.reportMetadata;
+    metadata.reportMetadata.standardDateFilter = standarddatefilter;
     var report = conn.analytics.report(reportID);
     var reportoptions = {
         "details": true,
