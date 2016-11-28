@@ -429,11 +429,11 @@ function startAsyncReport(startdate, enddate) {
             };
     // Old version - just sent metadata.
     // However bucket fields require the full report metadata to work or you get a BAD_REQUEST: Invalid value specified Bucket_field_xxxx. 
-    //var metadata = {
-    //    reportMetadata: {
-    //        "standardDateFilter": standarddatefilter
-    //    }
-    //};
+    var metadata = {
+        reportMetadata: {
+            "standardDateFilter": standarddatefilter
+        }
+    };
     metadata.reportMetadata = module.exports.reportMetadata;
     metadata.reportMetadata.standardDateFilter = standarddatefilter;
     var report = conn.analytics.report(reportID);
