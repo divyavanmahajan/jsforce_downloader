@@ -416,7 +416,7 @@ function prepareCSV(reportID) {
         stringifier.write(columns);
         return stringifier;
     }, function (err) {
-        console.err('prepareCSV: Cannot get report metadata:' + err);
+        console.error('prepareCSV: Cannot get report metadata:' + err);
     });
 }
 
